@@ -5,21 +5,21 @@ const nbpay = require("nbpay");
 const bsv = nbpay.bsv;
 const axios = require("axios");
 const fs = require("fs");
-const http = require("http");
+const express = require('express')
+const bodyParser = require('body-parser')
+const cors = require('cors')
 const url = require("url");
 const es = require("event-stream");
 const db = require("./db");
-//const shape = require("@libitx/shapeshifter.js");
 const crypt = require("./txtCrypt.js");
 const Minercraft = require("minercraft");
 const SQDB = require("better-sqlite3-helper");
-//const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
+const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
 
 const Hot_privateKey = process.env.hotkey
   ? crypt.decode(process.env.hotkey, ": P=4m+c$MZmWQxYjr")
   : null;
-//console.log(Hot_privateKey);
-const PATH_GETKEY = "/v1/getkey"; //?uid=%s (string) unique ID
+
 const PATH_ADDRESS = "/v1/address"; //?%address=%addr
 const PATH_TOPUP = "/v1/topup";
 const PATH_TX_LOOKUP = "/v1/tx/lookup";
@@ -42,6 +42,8 @@ const PROTOCOL_ID = "173ZfY97y7NjbZ2kA3syjStCcDNAxbvVD8";
 const ERROR_NO = 0;
 const ERROR_TOOSMALL = 1;
 const ERROR_PAY = 2;
+
+nbpay.auto_config();
 
 const miner = new Minercraft({
   //url: "https://merchantapi.matterpool.io",
@@ -83,333 +85,163 @@ let ignoreDetail = false;
 class mPoints {
   constructor(appID = "mpoints") {
     this.appID = appID;
-    this.storagePath = "./keys/";
     this.dbPath = __dirname + "/data/txdb.db";
   }
 
-  startSever(point) {
-    const server = http.createServer();
+  start(port) {
+    const app = express()
+    const self = this;
+    app.use(cors());
+    app.use(bodyParser.json({ limit: '50mb' }));
+    app.use(bodyParser.urlencoded({ limit: '50mb', extended: false, parameterLimit: 50000 }));
 
-    process.on("SIGINT", function() {
+    app.get(PATH_ADDRESS, async (req, res) => {
+      var data = await mPoints.getAddressInfo(req.query.address);
+      res.json(data);
+    })
+    app.get(PATH_TOPUP, async (req, res) => {
+      const query = req.query;
+      var data = await this.topUpAddress(
+        query.address,
+        Number(query.amount)
+      );
+      res.json(data);
+    })
+    app.get(PATH_TX_LOOKUP, (req, res) => {
+      var data = this.getTransaction(query.txid);
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8"
+      });
+      res.json(data);
+    })
+    app.get(PATH_TX_ALL, async (req, res) => {
+      var data = await this.getAllTX({
+        address: req.query.address,
+        num: Number(req.query.num),
+        sort: Number(req.query.sort),
+        start: Number(req.query.start),
+        end: Number(req.query.end),
+        skip: Number(req.query.skip)
+      });
+      res.json(data);
+    })
+    app.get(PATH_TX_MAIN, async (req, res) => {
+      ignoreDetail = true;
+      var data = await this.getAllTX({
+        address: req.query.address,
+        num: Number(req.query.num),
+        sort: Number(req.query.sort),
+        start: Number(req.query.start),
+        end: Number(req.query.end),
+        skip: Number(req.query.skip)
+      });
+      ignoreDetail = false;
+      res.json(data)
+    })
+    app.get(PATH_PAY_TX, async (req, res) => {
+      var data = await this.payTX(req.query.uid, req.query.tx);
+      res.json(data);
+    })
+    app.get(PATH_UTIL_PAY, async (req, res) => {
+      const IP = getClientIp(req);
+      const query = req.query;
+      console.log("IP:", IP);
+      var data = await this.util_payAddress(
+        query.address,
+        query.amount,
+        query.appdata,
+        query.comments,
+        query.appid
+      );
+      res.json(data);
+    })
+    app.get(PATH_TX_DEL, (req, res) => {
+      var data = this.delTransaction(req.query.txid);
+      res.json(data);
+    })
+    app.post(PATH_TX_SET, (req, res) => {
+      let ret = this.setTxData(req.body, true);
+      if (ret) res.end("success");
+      else res.end("error, no txid");
+    })
+    app.post(PATH_UTIL_DATAPAY, async (req, res) => {
+      var data = await this.util_dataPay(req.body);
+      res.json(data);
+    })
+    app.post(PATH_UTIL_DECODE, (req, res) => {
+      const obj = req.body
+      const rawtx = obj.rawtx;
+      if(!rawtx){
+        res.end("No rawtx")
+        return;
+      }
+      const tx = bsv.Transaction(rawtx);
+      let txData = tx.toJSON();
+      txData.inputs.forEach(inp => {
+        const sc = new bsv.Script.fromString(inp.script);
+        inp.address = sc.toAddress().toString();
+      });
+
+      txData.outputs.forEach(out => {
+        const sc = new bsv.Script.fromString(out.script);
+        out.address = sc.toAddress().toString();
+      });
+      res.json(txData);
+    })
+
+
+    process.on("SIGINT", function () {
       console.log("\nGracefully shutting down from SIGINT (Ctrl-C)");
       // some other closing procedures go here
 
       process.exit();
     });
+    app.listen(port, async function () {
+      console.log(`mpointAPI server started on port:`, port);
 
-    server
-      .on("request", async (req, res) => {
-        // Set CORS headers
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Request-Method", "*");
-        res.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET, POST");
-        res.setHeader("Access-Control-Allow-Headers", "*");
+    })
 
-        var pUrl = url.parse(req.url, true);
-        var query = pUrl.query;
-        console.log("pp", req.url);
-        if (req.method == "POST") {
-          //handle POST command
-          let self = this;
-          var body = "";
-          req.on("data", function(chunk) {
-            body += chunk;
-          });
-          req.on("end", async function() {
-            let obj = JSON.parse(body);
-            console.log(obj);
-            if (pUrl.pathname == PATH_TX_SET) {
-              let ret = self.setTxData(obj, true);
-              if (ret) res.end("success");
-              else res.end("error, no txid");
-            } else if (pUrl.pathname == PATH_UTIL_DATAPAY) {
-              var data = await self.util_dataPay(obj);
-              res.end(JSON.stringify(data));
-            } else if (pUrl.pathname == PATH_UTIL_DECODE) {
-              const rawtx = obj.rawtx;
-              const tx = bsv.Transaction(rawtx);
-              let txData = tx.toJSON();
-              txData.inputs.forEach(inp => {
-                const sc = new bsv.Script.fromString(inp.script);
-                inp.address = sc.toAddress().toString();
-              });
-
-              txData.outputs.forEach(out => {
-                const sc = new bsv.Script.fromString(out.script);
-                out.address = sc.toAddress().toString();
-              });
-              res.end(JSON.stringify(txData));
-            } else {
-              res.end("404");
-            }
-          });
-          return;
-        }
-        if (pUrl.pathname == PATH_GETKEY) {
-          var data = this.getKey(query.uid);
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_GET_ADDRESS) {
-          var data = await this.getAddress(query.app, query.uid);
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_ADDRESS) {
-          var data = await mPoints.getAddressInfo(query.address);
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_TOPUP) {
-          var data = await this.topUpAddress(
-            query.address,
-            Number(query.amount)
-          );
-          res.end(JSON.stringify(data));
-          return;
-        }
-
-        if (pUrl.pathname == PATH_TX_LOOKUP) {
-          var data = this.getTransaction(query.txid);
-          res.writeHead(200, {
-            "Content-Type": "application/json; charset=utf-8"
-          });
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_TX_DEL) {
-          var data = this.delTransaction(query.txid);
-          res.writeHead(200, {
-            "Content-Type": "application/json; charset=utf-8"
-          });
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_TX_ALL) {
-          console.log("get allTX called");
-          console.log(query);
-          var data = await this.getAllTX({
-            address: query.address,
-            num: Number(query.num),
-            sort: Number(query.sort),
-            start: Number(query.start),
-            end: Number(query.end),
-            skip: Number(query.skip)
-          });
-          res.writeHead(200, {
-            "Content-Type": "application/json; charset=utf-8"
-          });
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_TX_MAIN) {
-          console.log("get mainTX called");
-          console.log(query);
-          ignoreDetail = true;
-          var data = await this.getAllTX({
-            address: query.address,
-            num: Number(query.num),
-            sort: Number(query.sort),
-            start: Number(query.start),
-            end: Number(query.end),
-            skip: Number(query.skip)
-          });
-
-          res.writeHead(200, {
-            "Content-Type": "application/json; charset=utf-8"
-          });
-          res.end(JSON.stringify(data));
-          ignoreDetail = false;
-          return;
-        }
-        if (pUrl.pathname == PATH_PAY_TX) {
-          var data = await this.payTX(query.uid, query.tx);
-          res.end(JSON.stringify(data));
-          return;
-        }
-        if (pUrl.pathname == PATH_UTIL_PAY) {
-          const IP = getClientIp(req);
-          console.log("IP:", IP);
-          var data = await this.util_payAddress(
-            query.address,
-            query.amount,
-            query.appdata,
-            query.comments,
-            query.appid
-          );
-          res.end(JSON.stringify(data));
-          return;
-        }
-        {
-          //test code
-          let obj = {
-            app: "test",
-            txid:
-              "8b22783f9d19c912721b96d39069b5e629c01200d2d7f3fa2e5b628d4f9fb527",
-            product: "p1",
-            details: "okok",
-            tag: "shopping",
-            ts: 1500083,
-            type: ""
-          };
-          //this.getTxData(obj.txid);
-          //this.setTxData(obj, true);
-          //this.getAllTX("1PuMeZswjsAM7DFHMSdmAGfQ8sGvEctiF5");
-        }
-        res.end("404");
-      })
-      .listen(point);
   }
-  getKey(uID, bForceGenerate = false) {
-    var obj = this.getKeyFromStorage_(uID);
-    if (obj == null || bForceGenerate) {
-      var privateKey = bsv.PrivateKey.fromRandom();
-      var publicKey = bsv.PublicKey(privateKey);
-      var address = bsv.Address.fromPublicKey(publicKey);
-      var o = {
-        code: 0,
-        msg: "",
-        PrivateKey: privateKey.toWIF(),
-        PublicKey: publicKey.toHex(),
-        Address: address.toString()
-      };
-      this.saveKeyToStorage_(uID, o);
-      return o;
-    } else {
-      return obj;
-    }
-  }
-  getKeyFromStorage_(uID) {
-    try {
-      var data = fs.readFileSync(this.storagePath + uID + ".json");
-      var myObj = JSON.parse(data);
-      console.log(myObj);
-      return myObj;
-    } catch (err) {
-      console.log("There has been an error parsing your JSON.");
-      console.log(err);
-    }
-    return null;
-  }
-  saveKeyToStorage_(uID, o) {
-    var data;
-    var myObj = {};
-    try {
-      myObj = o;
-      console.log(myObj);
-      data = JSON.stringify(myObj);
-      fs.writeFile(this.storagePath + uID + ".json", data, function(err) {
-        if (err) {
-          console.log(
-            "There has been an error saving your configuration data."
-          );
-          console.log(err.message);
-          return;
-        }
-      });
-      console.log("Configuration saved successfully.");
-    } catch (err) {
-      console.log("There has been an error parsing your JSON.");
-      console.log(err);
-    }
-  }
-
-  async getAddress(app, uid) {
-    let address = await this.getAddressFromDb_(app, uid);
-
-    if (address == null) {
-      console.log("generate a new key");
-      var key = this.generateNewKey_(app, uid);
-      address = key.address;
-      this.saveKeyToDb_(key);
-    }
-
-    var o = {
-      code: 0,
-      msg: "",
-      address: address
-    };
-    return o;
-  }
-
-  generateNewKey_(app, uid) {
-    var privateKey = bsv.PrivateKey.fromRandom();
-    var publicKey = bsv.PublicKey(privateKey);
-    var address = bsv.Address.fromPublicKey(publicKey);
-    var key = {
-      app: app,
-      uid: uid,
-      privateKey: privateKey.toWIF(),
-      publicKey: publicKey.toHex(),
-      address: address.toString()
-    };
-    return key;
-  }
-
-  async saveKeyToDb_(key) {
-    var ts = Date.now();
-    var results = await db.insertKey(
-      key.app,
-      key.uid,
-      key.privateKey,
-      key.publicKey,
-      key.address,
-      ts
-    );
-    return true;
-  }
-
-  async getAddressFromDb_(app, uid) {
-    var results = await db.getAddressByAppUid(app, uid);
-    if (results == null) {
-      return null;
-    }
-    if (results.length == 0) {
-      return null;
-    }
-    return results[0].address;
-  }
-
   static async getAddressInfo_from_mtc_(address) {
-    if (!address) return null;
-    try {
-      const url =
-        "https://api.mattercloud.net/api/v3/main/address/" +
-        address +
-        "/balance";
-      const response = await axios.get(url);
-      //console.log(response);
-      const obj = {
-        balance: response.confirmed + response.unconfirmed
-      };
-      return obj;
-    } catch (err) {
-      console.log(err);
-      return null;
+      if(!address) return null;
+      try {
+        const url =
+          "https://api.mattercloud.net/api/v3/main/address/" +
+          address +
+          "/balance";
+        const response = await axios.get(url);
+        //console.log(response);
+        const obj = {
+          balance: response.confirmed + response.unconfirmed
+        };
+        return obj;
+      } catch(err) {
+        console.log(err);
+        return null;
+      }
     }
-  }
   static async getAddressInfo_from_woc_(address) {
-    if (!address) return null;
-    try {
-      const url =
-        "https://api.whatsonchain.com/v1/bsv/main/address/" +
-        address +
-        "/balance";
-      const response = await axios.get(url);
-      //console.log(response);
-      const obj = {
-        balance: response.data.confirmed + response.data.unconfirmed
-      };
-      return obj;
-    } catch (err) {
-      console.log(err);
-      return null;
+      if(!address) return null;
+      try {
+        const url =
+          "https://api.whatsonchain.com/v1/bsv/main/address/" +
+          address +
+          "/balance";
+        const response = await axios.get(url);
+        //console.log(response);
+        const obj = {
+          balance: response.data.confirmed + response.data.unconfirmed
+        };
+        return obj;
+      } catch(err) {
+        console.log(err);
+        return null;
+      }
     }
-  }
 
   static async getAddressInfo(address) {
-    var obj = await this.getAddressInfo_from_woc_(address);
-    if (obj != null) return obj;
+      var obj = await this.getAddressInfo_from_woc_(address);
+      if(obj != null) return obj;
     obj = await this.getAddressInfo_from_mtc_(address);
     if (obj != null) return obj;
     return null;
@@ -492,14 +324,7 @@ class mPoints {
     }
     return null;
   }
-  async getMinerFee(tx) {
-    //get fee of specific tx
-    const API = "https://api.metasv.com/v1/tx/" + tx;
-    const res = await axios.get(API);
-    //console.log(res.data);
-    if (res.data.code == 200) return res.data.data.txDetail.fee;
-    return -1;
-  }
+  
   async getOutputFromInput(input) {
     const txid = input.h;
     const pos = input.i;
@@ -715,8 +540,8 @@ class mPoints {
       responseType: "stream" // important
     });
     let items = [];
-    return new Promise(function(resolve, reject) {
-      res.data.on("end", function() {
+    return new Promise(function (resolve, reject) {
+      res.data.on("end", function () {
         //console.log("end of stream");
         resolve(items);
         return;
@@ -765,7 +590,7 @@ class mPoints {
   async util_dataPay(data) {
     return new Promise(resolve => {
       try {
-        
+
         const jsData = data; //JSON.parse(data);
         let payKey = "";
         if (jsData.key) {
@@ -829,16 +654,14 @@ class mPoints {
   }
 
   async sendRawTx(rawtx) {
-    console.log("sending tx");
-    let res = { code: -1, message: "wrong" };
-    try {
-      res = await miner.tx.push(rawtx);
-      console.log(res);
-    } catch (ex) {
-      console.log(ex);
-      return { code: -1, message: ex.message };
-    }
-    return res;
+    return new Promise(resolve=>{
+      console.log("sending tx");
+      nbpay.send({tx:rawtx},(err,txid,fee,raw)=>{
+        const res = {code:err?-1:0,txid:txid,message:err.message};
+        console.log("sent res:",res)
+        resolve(res);
+      })
+    })
   }
   async payUsingKey_(payObj) {
     return new Promise(resolve => {

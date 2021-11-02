@@ -12,14 +12,18 @@
   "dependencies": {
     "axios": "^0.21.1",
     "better-sqlite3-helper": "^3.1.0",
+    "body-parser": "^1.19.0",
     "bsv": "^1.2.0",
+    "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "event-stream": "^4.0.1",
     "express": "^4.17.1",
-    "nbpay": "^1.0.18",
     "minercraft": "^0.0.6",
+    "minimist": "^1.2.5",
     "mysql": "^2.18.1",
-    "node-json-db": "^1.1.0"
+    "nbpay": "^1.0.18",
+    "node-json-db": "^1.1.0",
+    "sensible-sdk": "^7.3.1"
   },
   "engines": {
     "node": "14.x"

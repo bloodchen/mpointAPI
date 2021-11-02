@@ -24,5 +24,4 @@ const listener = app.listen(process.env.PORT, function() {
   console.log("Your app is listening on port " + listener.address().port);
 });*/
 //console.log(process.env.HOTWALLET)
-mPoints.startSever(process.env.PORT);
-console.log("Your app is running on",process.env.PORT);
+mPoints.start(process.env.PORT);
