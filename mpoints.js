@@ -575,7 +575,7 @@ class mPoints {
       data: obj.data, //[PROTOCOL_ID,this.appID,{rtx:"this"},{comments:comments}],
       pay: {
         key: Hot_privateKey,
-        feeb: 0.3,
+        feeb: 0.5,
         to: [
           {
             address: obj.address,
