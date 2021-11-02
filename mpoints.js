@@ -96,10 +96,12 @@ class mPoints {
     app.use(bodyParser.urlencoded({ limit: '50mb', extended: false, parameterLimit: 50000 }));
 
     app.get(PATH_ADDRESS, async (req, res) => {
+      console.log("calling:",PATH_ADDRESS,"query:",req.query)
       var data = await mPoints.getAddressInfo(req.query.address);
       res.json(data);
     })
     app.get(PATH_TOPUP, async (req, res) => {
+      console.log("calling:",PATH_TOPUP,"query:",req.query)
       const query = req.query;
       var data = await this.topUpAddress(
         query.address,
@@ -108,6 +110,7 @@ class mPoints {
       res.json(data);
     })
     app.get(PATH_TX_LOOKUP, (req, res) => {
+      console.log("calling:",PATH_TX_LOOKUP,"query:",req.query)
       var data = this.getTransaction(query.txid);
       res.writeHead(200, {
         "Content-Type": "application/json; charset=utf-8"
@@ -115,6 +118,7 @@ class mPoints {
       res.json(data);
     })
     app.get(PATH_TX_ALL, async (req, res) => {
+      console.log("calling:",PATH_TX_ALL,"query:",req.query)
       var data = await this.getAllTX({
         address: req.query.address,
         num: Number(req.query.num),
@@ -126,6 +130,7 @@ class mPoints {
       res.json(data);
     })
     app.get(PATH_TX_MAIN, async (req, res) => {
+      console.log("calling:",PATH_TX_MAIN,"query:",req.query)
       ignoreDetail = true;
       var data = await this.getAllTX({
         address: req.query.address,
@@ -139,10 +144,12 @@ class mPoints {
       res.json(data)
     })
     app.get(PATH_PAY_TX, async (req, res) => {
+      console.log("calling:",PATH_PAY_TX,"query:",req.query)
       var data = await this.payTX(req.query.uid, req.query.tx);
       res.json(data);
     })
     app.get(PATH_UTIL_PAY, async (req, res) => {
+      console.log("calling:",PATH_UTIL_PAY,"query:",req.query)
       const IP = getClientIp(req);
       const query = req.query;
       console.log("IP:", IP);
@@ -156,19 +163,23 @@ class mPoints {
       res.json(data);
     })
     app.get(PATH_TX_DEL, (req, res) => {
+      console.log("calling:",PATH_TX_DEL,"query:",req.query)
       var data = this.delTransaction(req.query.txid);
       res.json(data);
     })
     app.post(PATH_TX_SET, (req, res) => {
+      console.log("calling:",PATH_TX_DEL,"body:",req.body)
       let ret = this.setTxData(req.body, true);
       if (ret) res.end("success");
       else res.end("error, no txid");
     })
     app.post(PATH_UTIL_DATAPAY, async (req, res) => {
+      console.log("calling:",PATH_TX_DEL,"body:",req.body)
       var data = await this.util_dataPay(req.body);
       res.json(data);
     })
     app.post(PATH_UTIL_DECODE, (req, res) => {
+      console.log("calling:",PATH_UTIL_DECODE,"body:",req.body)
       const obj = req.body
       const rawtx = obj.rawtx;
       if(!rawtx){
