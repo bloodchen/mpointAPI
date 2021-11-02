@@ -1,0 +1,917 @@
+"use strict";
+
+const process = require("process");
+const nbpay = require("nbpay");
+const bsv = nbpay.bsv;
+const axios = require("axios");
+const fs = require("fs");
+const http = require("http");
+const url = require("url");
+const es = require("event-stream");
+const db = require("./db");
+//const shape = require("@libitx/shapeshifter.js");
+const crypt = require("./txtCrypt.js");
+const Minercraft = require("minercraft");
+const SQDB = require("better-sqlite3-helper");
+//const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
+
+const Hot_privateKey = process.env.hotkey
+  ? crypt.decode(process.env.hotkey, ": P=4m+c$MZmWQxYjr")
+  : null;
+//console.log(Hot_privateKey);
+const PATH_GETKEY = "/v1/getkey"; //?uid=%s (string) unique ID
+const PATH_ADDRESS = "/v1/address"; //?%address=%addr
+const PATH_TOPUP = "/v1/topup";
+const PATH_TX_LOOKUP = "/v1/tx/lookup";
+const PATH_TX_ALL = "/v1/tx/all";
+const PATH_TX_MAIN = "/v1/tx/main";
+const PATH_TX_DEL = "/v1/tx/del";
+const PATH_PAY_TX = "/v1/pay/tx";
+const PATH_GET_ADDRESS = "/v1/getaddress"; //?app=1&uid=%uid
+const PATH_TX_SET = "/v1/tx/set_detail";
+
+//util API, used as utilities, not part of mpoints system
+const PATH_UTIL_PAY = "/v1/util/pay"; // pay to address using hot wallet
+const PATH_UTIL_DATAPAY = "/v1/util/datapay"; // pay using hot wallet, using nbpay format
+const PATH_UTIL_DECODE = "/v1/util/decode"; // decode rawtx
+
+const data_folder = __dirname + "/data/";
+
+const PROTOCOL_ID = "173ZfY97y7NjbZ2kA3syjStCcDNAxbvVD8";
+
+const ERROR_NO = 0;
+const ERROR_TOOSMALL = 1;
+const ERROR_PAY = 2;
+
+const miner = new Minercraft({
+  //url: "https://merchantapi.matterpool.io",
+  url: "https://merchantapi.taal.com",
+  //url: "https://www.ddpurse.com/openapi",
+  headers: {
+    "Content-Type": "application/json"
+  }
+});
+
+//获取访问id
+function getClientIp(req) {
+  const IP =
+    req.headers["x-forwarded-for"] ||
+    req.connection.remoteAddress ||
+    req.socket.remoteAddress ||
+    req.connection.socket.remoteAddress;
+  return IP.split(",")[0];
+}
+if (!fs.existsSync("logg")) {
+  fs.mkdirSync("logg");
+}
+var logStream = fs.createWriteStream("logg/loggs.txt", { flags: "a" });
+// use {flags: 'a'} to append and {flags: 'w'} to erase and write a new file
+
+function log(...args) {
+  let today = new Date();
+  let time = today.getDay() + ":" + today.getHours() + ":" + today.getMinutes();
+  let str = `[${time}] `;
+  for (let key of args) {
+    if (typeof key === "object" && key !== null) {
+      str += JSON.stringify(key) + " ";
+    } else str += key + " ";
+  }
+  logStream.write(str + "\n");
+  console.log(...args);
+}
+let ignoreDetail = false;
+class mPoints {
+  constructor(appID = "mpoints") {
+    this.appID = appID;
+    this.storagePath = "./keys/";
+    this.dbPath = __dirname + "/data/txdb.db";
+  }
+
+  startSever(point) {
+    const server = http.createServer();
+
+    process.on("SIGINT", function() {
+      console.log("\nGracefully shutting down from SIGINT (Ctrl-C)");
+      // some other closing procedures go here
+
+      process.exit();
+    });
+
+    server
+      .on("request", async (req, res) => {
+        // Set CORS headers
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Request-Method", "*");
+        res.setHeader("Access-Control-Allow-Methods", "OPTIONS, GET, POST");
+        res.setHeader("Access-Control-Allow-Headers", "*");
+
+        var pUrl = url.parse(req.url, true);
+        var query = pUrl.query;
+        console.log("pp", req.url);
+        if (req.method == "POST") {
+          //handle POST command
+          let self = this;
+          var body = "";
+          req.on("data", function(chunk) {
+            body += chunk;
+          });
+          req.on("end", async function() {
+            let obj = JSON.parse(body);
+            console.log(obj);
+            if (pUrl.pathname == PATH_TX_SET) {
+              let ret = self.setTxData(obj, true);
+              if (ret) res.end("success");
+              else res.end("error, no txid");
+            } else if (pUrl.pathname == PATH_UTIL_DATAPAY) {
+              var data = await self.util_dataPay(obj);
+              res.end(JSON.stringify(data));
+            } else if (pUrl.pathname == PATH_UTIL_DECODE) {
+              const rawtx = obj.rawtx;
+              const tx = bsv.Transaction(rawtx);
+              let txData = tx.toJSON();
+              txData.inputs.forEach(inp => {
+                const sc = new bsv.Script.fromString(inp.script);
+                inp.address = sc.toAddress().toString();
+              });
+
+              txData.outputs.forEach(out => {
+                const sc = new bsv.Script.fromString(out.script);
+                out.address = sc.toAddress().toString();
+              });
+              res.end(JSON.stringify(txData));
+            } else {
+              res.end("404");
+            }
+          });
+          return;
+        }
+        if (pUrl.pathname == PATH_GETKEY) {
+          var data = this.getKey(query.uid);
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_GET_ADDRESS) {
+          var data = await this.getAddress(query.app, query.uid);
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_ADDRESS) {
+          var data = await mPoints.getAddressInfo(query.address);
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_TOPUP) {
+          var data = await this.topUpAddress(
+            query.address,
+            Number(query.amount)
+          );
+          res.end(JSON.stringify(data));
+        }
+
+        if (pUrl.pathname == PATH_TX_LOOKUP) {
+          var data = this.getTransaction(query.txid);
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8"
+          });
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_TX_DEL) {
+          var data = this.delTransaction(query.txid);
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8"
+          });
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_TX_ALL) {
+          console.log("get allTX called");
+          console.log(query);
+          var data = await this.getAllTX({
+            address: query.address,
+            num: Number(query.num),
+            sort: Number(query.sort),
+            start: Number(query.start),
+            end: Number(query.end),
+            skip: Number(query.skip)
+          });
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8"
+          });
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_TX_MAIN) {
+          console.log("get mainTX called");
+          console.log(query);
+          ignoreDetail = true;
+          var data = await this.getAllTX({
+            address: query.address,
+            num: Number(query.num),
+            sort: Number(query.sort),
+            start: Number(query.start),
+            end: Number(query.end),
+            skip: Number(query.skip)
+          });
+
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8"
+          });
+          res.end(JSON.stringify(data));
+          ignoreDetail = false;
+        }
+        if (pUrl.pathname == PATH_PAY_TX) {
+          var data = await this.payTX(query.uid, query.tx);
+          res.end(JSON.stringify(data));
+        }
+        if (pUrl.pathname == PATH_UTIL_PAY) {
+          const IP = getClientIp(req);
+          console.log("IP:", IP);
+          var data = await this.util_payAddress(
+            query.address,
+            query.amount,
+            query.appdata,
+            query.comments,
+            query.appid
+          );
+          res.end(JSON.stringify(data));
+        }
+        {
+          //test code
+          let obj = {
+            app: "test",
+            txid:
+              "8b22783f9d19c912721b96d39069b5e629c01200d2d7f3fa2e5b628d4f9fb527",
+            product: "p1",
+            details: "okok",
+            tag: "shopping",
+            ts: 1500083,
+            type: ""
+          };
+          //this.getTxData(obj.txid);
+          //this.setTxData(obj, true);
+          //this.getAllTX("1PuMeZswjsAM7DFHMSdmAGfQ8sGvEctiF5");
+        }
+        res.end("404");
+      })
+      .listen(point);
+  }
+  getKey(uID, bForceGenerate = false) {
+    var obj = this.getKeyFromStorage_(uID);
+    if (obj == null || bForceGenerate) {
+      var privateKey = bsv.PrivateKey.fromRandom();
+      var publicKey = bsv.PublicKey(privateKey);
+      var address = bsv.Address.fromPublicKey(publicKey);
+      var o = {
+        code: 0,
+        msg: "",
+        PrivateKey: privateKey.toWIF(),
+        PublicKey: publicKey.toHex(),
+        Address: address.toString()
+      };
+      this.saveKeyToStorage_(uID, o);
+      return o;
+    } else {
+      return obj;
+    }
+  }
+  getKeyFromStorage_(uID) {
+    try {
+      var data = fs.readFileSync(this.storagePath + uID + ".json");
+      var myObj = JSON.parse(data);
+      console.log(myObj);
+      return myObj;
+    } catch (err) {
+      console.log("There has been an error parsing your JSON.");
+      console.log(err);
+    }
+    return null;
+  }
+  saveKeyToStorage_(uID, o) {
+    var data;
+    var myObj = {};
+    try {
+      myObj = o;
+      console.log(myObj);
+      data = JSON.stringify(myObj);
+      fs.writeFile(this.storagePath + uID + ".json", data, function(err) {
+        if (err) {
+          console.log(
+            "There has been an error saving your configuration data."
+          );
+          console.log(err.message);
+          return;
+        }
+      });
+      console.log("Configuration saved successfully.");
+    } catch (err) {
+      console.log("There has been an error parsing your JSON.");
+      console.log(err);
+    }
+  }
+
+  async getAddress(app, uid) {
+    let address = await this.getAddressFromDb_(app, uid);
+
+    if (address == null) {
+      console.log("generate a new key");
+      var key = this.generateNewKey_(app, uid);
+      address = key.address;
+      this.saveKeyToDb_(key);
+    }
+
+    var o = {
+      code: 0,
+      msg: "",
+      address: address
+    };
+    return o;
+  }
+
+  generateNewKey_(app, uid) {
+    var privateKey = bsv.PrivateKey.fromRandom();
+    var publicKey = bsv.PublicKey(privateKey);
+    var address = bsv.Address.fromPublicKey(publicKey);
+    var key = {
+      app: app,
+      uid: uid,
+      privateKey: privateKey.toWIF(),
+      publicKey: publicKey.toHex(),
+      address: address.toString()
+    };
+    return key;
+  }
+
+  async saveKeyToDb_(key) {
+    var ts = Date.now();
+    var results = await db.insertKey(
+      key.app,
+      key.uid,
+      key.privateKey,
+      key.publicKey,
+      key.address,
+      ts
+    );
+    return true;
+  }
+
+  async getAddressFromDb_(app, uid) {
+    var results = await db.getAddressByAppUid(app, uid);
+    if (results == null) {
+      return null;
+    }
+    if (results.length == 0) {
+      return null;
+    }
+    return results[0].address;
+  }
+
+  static async getAddressInfo_from_mtc_(address) {
+    if (!address) return null;
+    try {
+      const url =
+        "https://api.mattercloud.net/api/v3/main/address/" +
+        address +
+        "/balance";
+      const response = await axios.get(url);
+      //console.log(response);
+      const obj = {
+        balance: response.confirmed + response.unconfirmed
+      };
+      return obj;
+    } catch (err) {
+      console.log(err);
+      return null;
+    }
+  }
+  static async getAddressInfo_from_woc_(address) {
+    if (!address) return null;
+    try {
+      const url =
+        "https://api.whatsonchain.com/v1/bsv/main/address/" +
+        address +
+        "/balance";
+      const response = await axios.get(url);
+      //console.log(response);
+      const obj = {
+        balance: response.data.confirmed + response.data.unconfirmed
+      };
+      return obj;
+    } catch (err) {
+      console.log(err);
+      return null;
+    }
+  }
+
+  static async getAddressInfo(address) {
+    var obj = await this.getAddressInfo_from_woc_(address);
+    if (obj != null) return obj;
+    obj = await this.getAddressInfo_from_mtc_(address);
+    if (obj != null) return obj;
+    return null;
+  }
+  setTxData(obj, isDetail) {
+    console.log("setTxData");
+    //console.log(obj);
+    //console.log(obj);
+    if (obj.txid == undefined) return false;
+    const db = new SQDB({ path: this.dbPath, migrate: false });
+    try {
+      const txid = obj.txid;
+      if (isDetail) delete obj.txid;
+      let row = db.queryFirstRow("SELECT * FROM tx WHERE txid=?", txid);
+      let updateObj = isDetail
+        ? { detail: JSON.stringify(obj) }
+        : { main: JSON.stringify(obj) };
+      //console.log(updateObj);
+
+      if (row) {
+        if (row.main && isDetail) updateObj.main = row.main;
+        if (row.detail && !isDetail) updateObj.detail = row.detail;
+        //console.log("update-----------");
+        //console.log(updateObj);
+        db.update("tx", updateObj, { txid: txid });
+      } else {
+        updateObj.txid = txid;
+        //console.log("insert----------");
+        //console.log(updateObj);
+        db.insert("tx", updateObj);
+      }
+    } catch (e) {
+    } finally {
+      db.close();
+    }
+
+    return true;
+  }
+  delTransaction(txid) {
+    const db = new SQDB({ path: this.dbPath, migrate: false });
+    db.delete("tx", { txid: txid });
+    db.close();
+    return "OK";
+  }
+  getTransaction(tx) {
+    const db = new SQDB({ path: this.dbPath, migrate: false });
+    let row = db.queryFirstRow("SELECT * FROM tx WHERE txid=?", tx);
+    db.close();
+    if (row) {
+      let ret = {};
+      //console.log(row);
+      const main = JSON.parse(row.main);
+      if (main) ret.tx = main;
+      if (row.detail) {
+        const detail = JSON.parse(row.detail);
+        ret.detail = detail;
+      }
+      console.log(ret);
+      return ret;
+    }
+  }
+  getTxData(txid) {
+    const db = new SQDB({ path: this.dbPath, migrate: false });
+    let row = db.queryFirstRow("SELECT * FROM tx WHERE txid=?", txid);
+    db.close();
+    if (row) {
+      let ret = {};
+      //console.log(row);
+      const main = JSON.parse(row.main);
+      if (main) {
+        ret.tx = main;
+        if (!ret.tx.txid) ret.tx.txid = txid;
+      }
+      if (row.detail && !ignoreDetail) {
+        const detail = JSON.parse(row.detail);
+        ret.detail = detail;
+      }
+      //console.log(ret);
+      return ret;
+    }
+    return null;
+  }
+  async getMinerFee(tx) {
+    //get fee of specific tx
+    const API = "https://api.metasv.com/v1/tx/" + tx;
+    const res = await axios.get(API);
+    //console.log(res.data);
+    if (res.data.code == 200) return res.data.data.txDetail.fee;
+    return -1;
+  }
+  async getOutputFromInput(input) {
+    const txid = input.h;
+    const pos = input.i;
+    const query = {
+      q: {
+        find: { "tx.h": txid },
+        project: { "out.e": 1 }
+      }
+    };
+    let items = await this.getAllRawRecords(query, true);
+    if (items.length == 0) {
+      items = await this.getAllRawRecords(query, false);
+    }
+    if (items.length == 0 || !items[0].out) {
+      console.log("getOutputFromInput:failed to get utxo of txid:", txid);
+      return null;
+    }
+    return items[0].out[pos];
+  }
+  async buildOutputItem(tx) {
+    //console.log(tx);
+    let item = { amount: 0 };
+    item.c = tx.c;
+    item.type = tx.type;
+    item.txid = tx.tx.h;
+    item.fee = tx.fee;
+    item._out = [];
+    item._in = [];
+    //item.from = tx.in[0].e.a;
+    tx.in.some(inp => {
+      if (inp.e.a != "false") {
+        item.from = inp.e.a;
+        return true;
+      }
+      return false;
+    });
+    if (tx.blk != undefined) {
+      item.ts = tx.blk.t;
+      item.block = tx.blk.i;
+    }
+    if (tx.timestamp != undefined) {
+      item.ts = Math.trunc(tx.timestamp / 1000);
+    }
+    /* let fee = await this.getMinerFee(tx.tx.h);
+    if (fee != -1) tx.fee = fee; */
+
+    //console.log(item.amount);
+    let totalOutFee = 0,
+      totalInFee = 0;
+    for (let i = 0; i < tx.in.length; i++) {
+      let inn = tx.in[i];
+      const out = await this.getOutputFromInput(inn.e);
+      if (out) {
+        item._in.push({ a: out.e.a, v: out.e.v });
+        //console.log(out);
+        totalInFee += out.e.v;
+      }
+    }
+    for (let i = 0; i < tx.out.length; i++) {
+      let o = tx.out[i];
+      item._out.push({ a: o.e.a, v: o.e.v });
+      totalOutFee += o.e.v;
+    }
+    item.fee = totalInFee - totalOutFee;
+    return item;
+  }
+  calcItem(item, address) {
+    let tx = item.tx;
+    if (!tx._in || !tx._out) return;
+    tx.to = [];
+    tx.amount = 0;
+    let spend = false;
+    tx._in.forEach(ins => {
+      if (ins.a == address) {
+        spend = true;
+      }
+    });
+    if (spend) {
+      tx.type = "spend";
+      tx._in.forEach(ins => {
+        if (ins.a == address) {
+          tx.amount += ins.v;
+        }
+      });
+      tx._out.forEach(out => {
+        if (out.a == address) {
+          tx.amount -= out.v;
+        }
+        tx.to.push(out);
+      });
+    } else {
+      tx.type = "income";
+
+      tx._out.forEach(out => {
+        if (out.a == address) {
+          tx.amount += out.v;
+        }
+        tx.to.push(out);
+      });
+      //tx.to.push({a:address,v:tx.amount});
+    }
+    //console.log(tx);
+    delete tx._in;
+    delete tx._out;
+  }
+  async _handleItems(all, address, forceWrite = false) {
+    let allItems = [];
+    for (let i = 0; i < all.length; i++) {
+      let tx = all[i];
+      //console.log(tx);
+      let data = this.getTxData(tx.tx.h);
+      if (data && data.tx && !forceWrite) {
+        //console.log("found record");
+        //console.log(data);
+        this.calcItem(data, address);
+        allItems.push(data);
+        continue;
+      }
+
+      let item = await this.buildOutputItem(tx);
+      if (item) {
+        item.txid = tx.tx.h;
+        this.setTxData(item, false);
+        let i = { tx: item };
+        if (data && data.detail) i.detail = data.detail;
+        this.calcItem(i, address);
+        allItems.push(i);
+      }
+    }
+    return allItems;
+  }
+  async getAllTX({ address, num, sort, start, end, skip }) {
+    address = address.trim();
+    if (!address) return null;
+    if (isNaN(num)) num = 100;
+    if (isNaN(sort)) sort = -1;
+    if (isNaN(start)) start = 0;
+    if (isNaN(end)) end = 0;
+    if (isNaN(skip)) skip = 0;
+    let forceWrite = false;
+    if (sort == 2) {
+      sort = -1;
+      forceWrite = true;
+    }
+    const query = {
+      q: {
+        find: {
+          $or: [{ "in.e.a": address }, { "out.e.a": address }]
+        },
+        sort: { "blk.i": sort },
+        project: {
+          "tx.h": 1,
+          "in.e": 1,
+          "out.e": 1,
+          timestamp: 1,
+          blk: 1
+        },
+        limit: num,
+        skip: skip
+      }
+    };
+    if (start || end) {
+      query.q.find["blk.i"] = {};
+    }
+    if (start != 0) {
+      query.q.find["blk.i"]["$gt"] = start;
+    }
+    if (end != 0) {
+      query.q.find["blk.i"]["$lt"] = end;
+    }
+    //console.log(query);
+    const allc = await this.getAllRawRecords(query, true);
+    //console.log("raw length=" + allc);
+    let allc_ = await this._handleItems(allc, address, forceWrite);
+    //console.log(allc_);
+
+    const allu = await this.getAllRawRecords(query, false);
+    //console.log("unconfirmed raw=" + allu);
+    let allu_ = await this._handleItems(allu, address, forceWrite);
+
+    let all = {
+      c: allc_,
+      u: allu_
+    };
+    return all;
+  }
+  async getAllRawRecords(query, isConfirm = true, skiptx = "") {
+    let url = "https://txo.bitbus.network/block";
+    if (!isConfirm) {
+      url = "https://txo.bitsocket.network/crawl";
+      query.q.limit = 1;
+      query.q.sort = { "blk.i": -1 };
+      query.q.find["blk.i"] = { $gt: 609000 };
+      let items = await this.getAllRawRecords(query, true);
+      //console.log("length----" + items.length);
+      if (items.length != 0) skiptx = items[0].tx.h;
+      query.q.sort = { timestamp: -1 };
+      query.q.limit = 1000;
+      delete query.q.find["blk.i"];
+      query.q.find["timestamp"] = {
+        $gt: Date.now() - 100000 * 36 //got unconfirmed tx in one hour
+      };
+      //console.log(query);
+    }
+    let skip = false;
+    let res = await axios.post(url, JSON.stringify(query), {
+      headers: {
+        "Content-type": "application/json; charset=utf-8",
+        Accept: "application/json; charset=utf-8",
+        token:
+          "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiIxQzc5M0RkVjI0Q3NORTJFUDZNbVZmckhqVlNGVmc2dU4iLCJpc3N1ZXIiOiJnZW5lcmljLWJpdGF1dGgifQ.SUJlYUc2TGNGdFlZaGk3amxwa3ZoRGZJUEpFcGhObWhpdVNqNXVBbkxORTdLMWRkaGNESC81SWJmM2J1N0V5SzFuakpKTWFPNXBTcVJlb0ZHRm5uSi9VPQ"
+      },
+      responseType: "stream" // important
+    });
+    let items = [];
+    return new Promise(function(resolve, reject) {
+      res.data.on("end", function() {
+        //console.log("end of stream");
+        resolve(items);
+        return;
+      });
+      res.data.pipe(es.split()).pipe(
+        es.map((data, callback) => {
+          if (data) {
+            let d = JSON.parse(data);
+
+            if (skiptx == d.tx.h) {
+              console.log("found:" + skiptx);
+              skip = true;
+            }
+            if (skip == false) items.push(d);
+            //if(isConfirm==false)
+            //console.log(d);
+          }
+        })
+      );
+    });
+  }
+
+  /**
+   * @param  {} obj.data : data passed to OP_RETURN
+   *            obj.address: send to address
+   *            obj.amount: amount of sat
+   */
+  generateConfig(obj) {
+    var config = {
+      safe: true,
+      data: obj.data, //[PROTOCOL_ID,this.appID,{rtx:"this"},{comments:comments}],
+      pay: {
+        key: Hot_privateKey,
+        feeb: 0.3,
+        to: [
+          {
+            address: obj.address,
+            value: obj.amount
+          }
+        ]
+      }
+    };
+    if (typeof obj.privateKey !== "undefined") config.pay.key = obj.privateKey;
+    return config;
+  }
+  async util_dataPay(data) {
+    return new Promise(resolve => {
+      try {
+        
+        const jsData = data; //JSON.parse(data);
+        let payKey = "";
+        if (jsData.key) {
+          const buf = Buffer.from(jsData.key, "base64");
+          payKey = buf.toString();
+          console.log(payKey);
+        } else {
+          payKey = Hot_privateKey;
+        }
+        if (jsData.appid && jsData.appid == "mmgrid") {
+          payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
+        }
+        const config = {
+          pay: {
+            key: bsv.PrivateKey.fromWIF(payKey),
+            to: jsData.to,
+            feeb: 0.5
+          }
+        };
+        //console.log(config);
+        nbpay.send(config, (err, tx) => {
+          console.log(err, tx);
+          resolve({ code: err ? err : 0, txid: tx.toString() });
+        });
+      } catch (e) {
+        console.log(e);
+        resolve({ code: -1, message: e.message });
+      }
+    });
+  }
+  async util_payAddress(address, amount, appdata, comments, appid) {
+    if (address == "" || address == null || amount == null) return null;
+    let payKey = Hot_privateKey;
+    if (appid == "mmgrid") {
+      payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
+    }
+    var payObj = {
+      privateKey: payKey,
+      address: address,
+      amount: amount,
+      appdata: appdata,
+      comments: comments
+    };
+    console.log("payObj:", payObj);
+    return await this.payUsingKey_(payObj);
+  }
+  /**
+   * @param  {} address: address to topup
+   * @param  {} amount: number of sat
+   * @param  {} comments=""
+   */
+  async topUpAddress(address, amount, appdata = "", comments = "") {
+    var payObj = {
+      privateKey: Hot_privateKey,
+      address: address,
+      amount: amount,
+      appdata: appdata,
+      comments: comments
+    };
+    return await this.payUsingKey_(payObj);
+  }
+
+  async sendRawTx(rawtx) {
+    console.log("sending tx");
+    let res = { code: -1, message: "wrong" };
+    try {
+      res = await miner.tx.push(rawtx);
+      console.log(res);
+    } catch (ex) {
+      console.log(ex);
+      return { code: -1, message: ex.message };
+    }
+    return res;
+  }
+  async payUsingKey_(payObj) {
+    return new Promise(resolve => {
+      var privateKey = payObj.privateKey,
+        address = payObj.address,
+        amount = parseInt(payObj.amount, 10),
+        appdata = payObj.appdata,
+        comments = payObj.comments,
+        appid = payObj.appid;
+      var pKey = bsv.PrivateKey.fromWIF(privateKey);
+      var aid = appid;
+      if (typeof aid == "undefined") aid = this.appID;
+      if (typeof appdata == "undefined") appdata = "";
+      if (typeof comments == "undefined") comments = "";
+      var sAppdata = JSON.stringify({ rtx: "this", aData: appdata });
+      var sUserdata = JSON.stringify({ comments: comments });
+      var obj = {
+        data: [PROTOCOL_ID, aid, sAppdata, sUserdata],
+        address: address,
+        amount: amount,
+        privateKey: pKey
+      };
+      var config = this.generateConfig(obj);
+      console.log(obj);
+      if (amount < 200) {
+        resolve({ code: ERROR_TOOSMALL, msg: "cannot topup small amount" });
+        return;
+      }
+
+      nbpay.build(config, async (err, tx) => {
+        var ret = { code: ERROR_PAY, msg: err };
+        if (err == null) {
+          delete payObj.privateKey;
+          ret = await this.sendRawTx(tx.toString());
+          if (ret.returnResult == "success") {
+            ret.code = ERROR_NO;
+            log(
+              "Success Payment Obj:",
+              JSON.stringify(payObj),
+              " result:",
+              JSON.stringify(ret)
+            );
+          } else {
+            delete ret.txid;
+            log("Failed:", " result:", JSON.stringify(ret));
+          }
+        } else {
+          log("Failed1:", " result:", JSON.stringify(ret));
+        }
+        resolve(ret);
+      });
+    });
+  }
+  /**
+   * @param  {} uid: user id
+   * @param  {} utx: unsigned tx
+   * @param  {} bBuildOnly=true: when set to true, only build not broadcast, can get fee from results
+   */
+  async payTX(uid, utx, bBuildOnly = true) {
+    var trans = bsv.Transaction(utx);
+    var user = this.getKey(uid);
+    var privateKey;
+    if (user == null) return null;
+    var privateKey = bsv.PrivateKey.fromWIF(user.PrivateKey);
+    var config = {
+      tx: utx,
+      pay: {
+        key: privateKey,
+        feeb: 1
+      }
+    };
+    if (bBuildOnly) {
+      return new Promise(resolve => {
+        nbpay.build(config, (err, tx) => {
+          resolve({
+            code: ERROR_PAY,
+            msg: err,
+            tx: tx
+          });
+        });
+      });
+    }
+  }
+}
+
+module.exports = mPoints;

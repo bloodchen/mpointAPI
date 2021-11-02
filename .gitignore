@@ -1,3 +1,7 @@
+./data/txdb.db
+.env
+./logg/*
+
 # Logs
 logs
 *.log
