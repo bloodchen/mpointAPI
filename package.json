@@ -16,7 +16,7 @@
     "dotenv": "^8.2.0",
     "event-stream": "^4.0.1",
     "express": "^4.17.1",
-    "nbpay": "^1.0.17",
+    "nbpay": "^1.0.18",
     "minercraft": "^0.0.6",
     "mysql": "^2.18.1",
     "node-json-db": "^1.1.0"

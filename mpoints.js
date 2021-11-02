@@ -148,14 +148,17 @@ class mPoints {
         if (pUrl.pathname == PATH_GETKEY) {
           var data = this.getKey(query.uid);
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_GET_ADDRESS) {
           var data = await this.getAddress(query.app, query.uid);
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_ADDRESS) {
           var data = await mPoints.getAddressInfo(query.address);
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_TOPUP) {
           var data = await this.topUpAddress(
@@ -163,6 +166,7 @@ class mPoints {
             Number(query.amount)
           );
           res.end(JSON.stringify(data));
+          return;
         }
 
         if (pUrl.pathname == PATH_TX_LOOKUP) {
@@ -171,6 +175,7 @@ class mPoints {
             "Content-Type": "application/json; charset=utf-8"
           });
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_TX_DEL) {
           var data = this.delTransaction(query.txid);
@@ -178,6 +183,7 @@ class mPoints {
             "Content-Type": "application/json; charset=utf-8"
           });
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_TX_ALL) {
           console.log("get allTX called");
@@ -194,6 +200,7 @@ class mPoints {
             "Content-Type": "application/json; charset=utf-8"
           });
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_TX_MAIN) {
           console.log("get mainTX called");
@@ -213,10 +220,12 @@ class mPoints {
           });
           res.end(JSON.stringify(data));
           ignoreDetail = false;
+          return;
         }
         if (pUrl.pathname == PATH_PAY_TX) {
           var data = await this.payTX(query.uid, query.tx);
           res.end(JSON.stringify(data));
+          return;
         }
         if (pUrl.pathname == PATH_UTIL_PAY) {
           const IP = getClientIp(req);
@@ -229,6 +238,7 @@ class mPoints {
             query.appid
           );
           res.end(JSON.stringify(data));
+          return;
         }
         {
           //test code
