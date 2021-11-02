@@ -654,16 +654,6 @@ class mPoints {
     return await this.payUsingKey_(payObj);
   }
 
-  async sendRawTx(rawtx) {
-    return new Promise(resolve=>{
-      console.log("sending tx");
-      nbpay.send({tx:rawtx},(err,txid,fee,raw)=>{
-        const res = {code:err?-1:0,txid:txid,message:err.message};
-        console.log("sent res:",res)
-        resolve(res);
-      })
-    })
-  }
   async payUsingKey_(payObj) {
     
       var privateKey = payObj.privateKey,
@@ -692,6 +682,7 @@ class mPoints {
         return;
       }
       const res = await nbpay.send(config);
+      delete payObj.privateKey;
       const ret = {code:res.err?-1:0,txid:res.txid,message:res.err}
       log(res.err?"Failed:":"Success Payment Obj:",JSON.stringify(payObj),JSON.stringify(ret));
 
