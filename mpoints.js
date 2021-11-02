@@ -12,7 +12,7 @@ const url = require("url");
 const es = require("event-stream");
 const db = require("./db");
 const crypt = require("./txtCrypt.js");
-const Minercraft = require("minercraft");
+
 const SQDB = require("better-sqlite3-helper");
 const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
 
@@ -44,15 +44,6 @@ const ERROR_TOOSMALL = 1;
 const ERROR_PAY = 2;
 
 nbpay.auto_config();
-
-const miner = new Minercraft({
-  //url: "https://merchantapi.matterpool.io",
-  url: "https://merchantapi.taal.com",
-  //url: "https://www.ddpurse.com/openapi",
-  headers: {
-    "Content-Type": "application/json"
-  }
-});
 
 //获取访问id
 function getClientIp(req) {
@@ -379,8 +370,6 @@ class mPoints {
     if (tx.timestamp != undefined) {
       item.ts = Math.trunc(tx.timestamp / 1000);
     }
-    /* let fee = await this.getMinerFee(tx.tx.h);
-    if (fee != -1) tx.fee = fee; */
 
     //console.log(item.amount);
     let totalOutFee = 0,
@@ -599,8 +588,7 @@ class mPoints {
     return config;
   }
   async util_dataPay(data) {
-    return new Promise(resolve => {
-      try {
+  
 
         const jsData = data; //JSON.parse(data);
         let payKey = "";
@@ -622,15 +610,17 @@ class mPoints {
           }
         };
         //console.log(config);
-        nbpay.send(config, (err, tx) => {
+        const res = await nbpay.send(config);
+        return {code:res.err?-1:0,message:res.err}
+        /*nbpay.send(config, (err, tx) => {
           console.log(err, tx);
           resolve({ code: err ? err : 0, txid: tx.toString() });
         });
       } catch (e) {
         console.log(e);
         resolve({ code: -1, message: e.message });
-      }
-    });
+      }*/
+    
   }
   async util_payAddress(address, amount, appdata, comments, appid) {
     if (address == "" || address == null || amount == null) return null;
@@ -675,7 +665,7 @@ class mPoints {
     })
   }
   async payUsingKey_(payObj) {
-    return new Promise(resolve => {
+    
       var privateKey = payObj.privateKey,
         address = payObj.address,
         amount = parseInt(payObj.amount, 10),
@@ -701,8 +691,13 @@ class mPoints {
         resolve({ code: ERROR_TOOSMALL, msg: "cannot topup small amount" });
         return;
       }
+      const res = await nbpay.send(config);
+      const ret = {code:res.err?-1:0,txid:res.txid,message:res.err}
+      log(res.err?"Failed:":"Success Payment Obj:",JSON.stringify(payObj),JSON.stringify(ret));
 
-      nbpay.build(config, async (err, tx) => {
+      return ret
+
+      /*nbpay.build(config, async (err, tx) => {
         var ret = { code: ERROR_PAY, msg: err };
         if (err == null) {
           delete payObj.privateKey;
@@ -722,9 +717,8 @@ class mPoints {
         } else {
           log("Failed1:", " result:", JSON.stringify(ret));
         }
-        resolve(ret);
-      });
-    });
+      });*/
+  
   }
   /**
    * @param  {} uid: user id

@@ -18,10 +18,9 @@
     "dotenv": "^8.2.0",
     "event-stream": "^4.0.1",
     "express": "^4.17.1",
-    "minercraft": "^0.0.6",
     "minimist": "^1.2.5",
     "mysql": "^2.18.1",
-    "nbpay": "^1.0.18",
+    "nbpay": "^1.0.19",
     "node-json-db": "^1.1.0",
     "sensible-sdk": "^7.3.1"
   },
