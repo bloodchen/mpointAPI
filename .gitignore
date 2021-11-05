@@ -1,4 +1,4 @@
-./data/txdb.db
+./data/*
 .env
 ./logg/*
 
