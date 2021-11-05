@@ -26,16 +26,12 @@ const PATH_TX_LOOKUP = "/v1/tx/lookup";
 const PATH_TX_ALL = "/v1/tx/all";
 const PATH_TX_MAIN = "/v1/tx/main";
 const PATH_TX_DEL = "/v1/tx/del";
-const PATH_PAY_TX = "/v1/pay/tx";
-const PATH_GET_ADDRESS = "/v1/getaddress"; //?app=1&uid=%uid
 const PATH_TX_SET = "/v1/tx/set_detail";
 
 //util API, used as utilities, not part of mpoints system
 const PATH_UTIL_PAY = "/v1/util/pay"; // pay to address using hot wallet
 const PATH_UTIL_DATAPAY = "/v1/util/datapay"; // pay using hot wallet, using nbpay format
 const PATH_UTIL_DECODE = "/v1/util/decode"; // decode rawtx
-
-const data_folder = __dirname + "/data/";
 
 const PROTOCOL_ID = "173ZfY97y7NjbZ2kA3syjStCcDNAxbvVD8";
 
@@ -103,9 +99,6 @@ class mPoints {
     app.get(PATH_TX_LOOKUP, (req, res) => {
       console.log("calling:",PATH_TX_LOOKUP,"query:",req.query)
       var data = this.getTransaction(query.txid);
-      res.writeHead(200, {
-        "Content-Type": "application/json; charset=utf-8"
-      });
       res.json(data);
     })
     app.get(PATH_TX_ALL, async (req, res) => {
@@ -133,11 +126,6 @@ class mPoints {
       });
       ignoreDetail = false;
       res.json(data)
-    })
-    app.get(PATH_PAY_TX, async (req, res) => {
-      console.log("calling:",PATH_PAY_TX,"query:",req.query)
-      var data = await this.payTX(req.query.uid, req.query.tx);
-      res.json(data);
     })
     app.get(PATH_UTIL_PAY, async (req, res) => {
       console.log("calling:",PATH_UTIL_PAY,"query:",req.query)
@@ -457,6 +445,8 @@ class mPoints {
     return allItems;
   }
   async getAllTX({ address, num, sort, start, end, skip }) {
+    if(!address)return null;
+
     address = address.trim();
     if (!address) return null;
     if (isNaN(num)) num = 100;
@@ -588,8 +578,6 @@ class mPoints {
     return config;
   }
   async util_dataPay(data) {
-  
-
         const jsData = data; //JSON.parse(data);
         let payKey = "";
         if (jsData.key) {
@@ -612,14 +600,6 @@ class mPoints {
         //console.log(config);
         const res = await nbpay.send(config);
         return {code:res.err?-1:0,message:res.err}
-        /*nbpay.send(config, (err, tx) => {
-          console.log(err, tx);
-          resolve({ code: err ? err : 0, txid: tx.toString() });
-        });
-      } catch (e) {
-        console.log(e);
-        resolve({ code: -1, message: e.message });
-      }*/
     
   }
   async util_payAddress(address, amount, appdata, comments, appid) {
@@ -628,6 +608,7 @@ class mPoints {
     if (appid == "mmgrid") {
       payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
     }
+    console.log(payKey)
     var payObj = {
       privateKey: payKey,
       address: address,
@@ -685,61 +666,7 @@ class mPoints {
       delete payObj.privateKey;
       const ret = {code:res.err?-1:0,txid:res.txid,message:res.err}
       log(res.err?"Failed:":"Success Payment Obj:",JSON.stringify(payObj),JSON.stringify(ret));
-
       return ret
-
-      /*nbpay.build(config, async (err, tx) => {
-        var ret = { code: ERROR_PAY, msg: err };
-        if (err == null) {
-          delete payObj.privateKey;
-          ret = await this.sendRawTx(tx.toString());
-          if (ret.returnResult == "success") {
-            ret.code = ERROR_NO;
-            log(
-              "Success Payment Obj:",
-              JSON.stringify(payObj),
-              " result:",
-              JSON.stringify(ret)
-            );
-          } else {
-            delete ret.txid;
-            log("Failed:", " result:", JSON.stringify(ret));
-          }
-        } else {
-          log("Failed1:", " result:", JSON.stringify(ret));
-        }
-      });*/
-  
-  }
-  /**
-   * @param  {} uid: user id
-   * @param  {} utx: unsigned tx
-   * @param  {} bBuildOnly=true: when set to true, only build not broadcast, can get fee from results
-   */
-  async payTX(uid, utx, bBuildOnly = true) {
-    var trans = bsv.Transaction(utx);
-    var user = this.getKey(uid);
-    var privateKey;
-    if (user == null) return null;
-    var privateKey = bsv.PrivateKey.fromWIF(user.PrivateKey);
-    var config = {
-      tx: utx,
-      pay: {
-        key: privateKey,
-        feeb: 1
-      }
-    };
-    if (bBuildOnly) {
-      return new Promise(resolve => {
-        nbpay.build(config, (err, tx) => {
-          resolve({
-            code: ERROR_PAY,
-            msg: err,
-            tx: tx
-          });
-        });
-      });
-    }
   }
 }
 
