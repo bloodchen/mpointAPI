@@ -17,9 +17,8 @@ const SQDB = require("better-sqlite3-helper");
 const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
 
 const Hot_privateKey = process.env.hotkey
-  ? crypt.decode(process.env.hotkey, ": P=4m+c$MZmWQxYjr")
+  ? crypt.decode(process.env.hotkey1, ": P=4m+c$MZmWQxYjr")
   : null;
-
 const PATH_ADDRESS = "/v1/address"; //?%address=%addr
 const PATH_TOPUP = "/v1/topup";
 const PATH_TX_LOOKUP = "/v1/tx/lookup";
