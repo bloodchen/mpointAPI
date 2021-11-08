@@ -16,7 +16,7 @@ const crypt = require("./txtCrypt.js");
 const SQDB = require("better-sqlite3-helper");
 const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
 
-const Hot_privateKey = process.env.hotkey
+const Hot_privateKey = process.env.hotkey1
   ? crypt.decode(process.env.hotkey1, ": P=4m+c$MZmWQxYjr")
   : null;
 const PATH_ADDRESS = "/v1/address"; //?%address=%addr
