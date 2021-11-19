@@ -364,7 +364,7 @@ class mPoints {
     for (let i = 0; i < tx.in.length; i++) {
       let inn = tx.in[i];
       const out = await this.getOutputFromInput(inn.e);
-      if (out) {
+      if (out&&out.e) {
         item._in.push({ a: out.e.a, v: out.e.v });
         //console.log(out);
         totalInFee += out.e.v;
@@ -372,8 +372,10 @@ class mPoints {
     }
     for (let i = 0; i < tx.out.length; i++) {
       let o = tx.out[i];
-      item._out.push({ a: o.e.a, v: o.e.v });
-      totalOutFee += o.e.v;
+      if(o.e){
+        item._out.push({ a: o.e.a, v: o.e.v });
+        totalOutFee += o.e.v;
+      }
     }
     item.fee = totalInFee - totalOutFee;
     return item;
