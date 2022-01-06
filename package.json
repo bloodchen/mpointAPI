@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "axios": "^0.21.1",
+    "better-sqlite3": "^7.4.6",
     "better-sqlite3-helper": "^3.1.0",
     "body-parser": "^1.19.0",
     "bsv": "^1.2.0",
@@ -23,9 +24,6 @@
     "nbpay": "^1.0.19",
     "node-json-db": "^1.1.0",
     "sensible-sdk": "^7.3.1"
-  },
-  "engines": {
-    "node": "14.x"
   },
   "repository": {
     "url": "https://glitch.com/edit/#!/hello-express"

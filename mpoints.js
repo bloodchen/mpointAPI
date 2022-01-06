@@ -68,6 +68,10 @@ function log(...args) {
   console.log(...args);
 }
 let ignoreDetail = false;
+
+const Crawler = require("./crawler");
+const crawler = new Crawler
+
 class mPoints {
   constructor(appID = "mpoints") {
     this.appID = appID;
@@ -445,6 +449,19 @@ class mPoints {
     }
     return allItems;
   }
+  
+  async getAllTX1({ address, num, sort, start, end, skip }){
+    if(!address)return null;
+
+    address = address.trim();
+    if (!address) return null;
+    if (isNaN(num)) num = 100;
+    if (isNaN(sort)) sort = -1;
+    if (isNaN(start)) start = 0;
+    if (isNaN(end)) end = 0;
+    if (isNaN(skip)) skip = 0;
+    return await crawler.getTxHistory({address,num,start,end})
+  }
   async getAllTX({ address, num, sort, start, end, skip }) {
     if(!address)return null;
 
@@ -590,6 +607,9 @@ class mPoints {
         }
         if (jsData.appid && jsData.appid == "mmgrid") {
           payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
+        }
+        if (jsData.appid && jsData.appid == "mmgrid1") {
+          payKey = crypt.decode(process.env.mmkey1, ": P=4==m+c$MZmWQxYjr");
         }
         const config = {
           pay: {
