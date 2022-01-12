@@ -32,7 +32,7 @@ class Crawler {
             }
             this.relateToAddress(address, txs.c, raw)
             this.relateToAddress(address, txs.u, raw)
-            console.log(txs)
+            //console.log(txs)
         }
         return txs
     }
@@ -86,23 +86,6 @@ class Crawler {
                     txids = []
                 }
             }
-           /* let hex;
-            try {
-                console.log('woc--getting rawtx of:', tx.txid)
-                response = await axios.get(`https://api.whatsonchain.com/v1/bsv/main/tx/${tx.txid}/hex`)
-                hex = response.data
-            } catch (e) {
-                console.log('run--getting rawtx of:', tx.txid)
-                response = await axios.get(`https://api.run.network/v1/main/tx/${txid.txid}`)
-                hex = response.data.hex
-            }
-            if (!hex) {
-                console.error("Download rawtx failed");
-            } else {
-                console.log('success')
-                tx.raw = hex
-            }*/
-
         }
 
     }
