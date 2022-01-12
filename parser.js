@@ -8,13 +8,14 @@ class Parser{
         this.crawler = crawler
         this.db = db
     }
-    async parseRaw(txin){
+    async parseRaw(txin,utxos){
         const rawtx = txin.raw
         const tx = bsv.Transaction(rawtx)
         txin.addresses = ""
         let addresses = new Set
         let main = {from:[],to:[],fee:0}
         let value_in = 0,value_out=0
+
         for(const inp of tx.inputs){
             let address = null
             const preTxid = inp.prevTxId.toString('hex')
@@ -24,7 +25,8 @@ class Parser{
             }catch(e){
                 address = false
             }
-            const amount = await WOCAPI.getUtxoValue(preTxid,inp.outputIndex)
+            //const amount = await WOCAPI.getUtxoValue(preTxid,inp.outputIndex)
+            const amount = utxos[preTxid].value
             main.from.push({address:address,value:amount})
             if(address)
                 addresses.add(address)

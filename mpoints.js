@@ -24,6 +24,7 @@ const PATH_TOPUP = "/v1/topup";
 const PATH_TX_LOOKUP = "/v1/tx/lookup";
 const PATH_TX_ALL = "/v1/tx/all";
 const PATH_TX_MAIN = "/v1/tx/main";
+const PATH_ADDRESS_HISTORY = "/v2/address/:address/history";
 const PATH_TX_DEL = "/v1/tx/del";
 const PATH_TX_SET = "/v1/tx/set_detail";
 
@@ -70,6 +71,7 @@ function log(...args) {
 let ignoreDetail = false;
 
 const Crawler = require("./crawler");
+const req = require("express/lib/request");
 const crawler = new Crawler
 
 class mPoints {
@@ -115,6 +117,25 @@ class mPoints {
         skip: Number(req.query.skip)
       });
       res.json(data);
+    })
+    app.get("/v2/address/:address/prefetch",(req,res)=>{
+      const address = req.params['address']
+      this.preFetchAddress({address,blockchain:req.query.blockchain})
+      res.json({code:0,msg:"ok"})
+    })
+    app.get("/v2/address/:address/history",async (req,res)=>{
+      const address = req.params['address']
+      console.log("calling:",PATH_ADDRESS_HISTORY,"query:",req.query)
+      var data = await this.getAllTX2({
+        address,
+        num: Number(req.query.num),
+        sort: Number(req.query.sort),
+        start: Number(req.query.start),
+        end: Number(req.query.end),
+        skip: Number(req.query.skip),
+        blockchain:req.query.blockchain
+      });
+      res.json(data)
     })
     app.get(PATH_TX_MAIN, async (req, res) => {
       console.log("calling:",PATH_TX_MAIN,"query:",req.query)
@@ -449,8 +470,10 @@ class mPoints {
     }
     return allItems;
   }
-  
-  async getAllTX1({ address, num, sort, start, end, skip }){
+  async preFetchAddress({address,blockchain='bsv'}){
+    crawler.preFetch({address,blockchain})
+  }
+  async getAllTX2({ address, num, sort, start, end, skip,blockchain }){
     if(!address)return null;
 
     address = address.trim();
@@ -460,7 +483,7 @@ class mPoints {
     if (isNaN(start)) start = 0;
     if (isNaN(end)) end = 0;
     if (isNaN(skip)) skip = 0;
-    return await crawler.getTxHistory({address,num,start,end})
+    return await crawler.getTxHistory({address,num,start,end,blockchain})
   }
   async getAllTX({ address, num, sort, start, end, skip }) {
     if(!address)return null;

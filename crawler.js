@@ -1,36 +1,46 @@
 const axios = require('axios')
 const Parser = require('./parser')
-const { PlanAPI, WOCAPI } = require('./APIs')
+const bsv = require('bsv')
+const { PlanAPI, WOCAPI, SensibleAPI, ARAPI } = require('./APIs')
 const Database = require('./db')
+const BLOCK_MIN = 637173
 class Crawler {
     constructor(api, db) {
-        this.api = new WOCAPI
-        this.db = new Database(__dirname + "/data/newdb.db")
+        this.bsv = SensibleAPI
+        this.db = new Database(__dirname + "/data/db2.db")
         this.parser = new Parser(this, db)
     }
     start() {
         this.allAddress = this.db.getAllAddr()
 
     }
-    async getTxHistory({ address, num, start, end }) {
+    async preFetch({address,blockchain}) {
+        this.getTxHistory({ address, num: 1000,blockchain })
+    }
+    async getTxHistory({ address, num=10, start = BLOCK_MIN, end=0, raw = false, blockchain = 'bsv' }) {
         let txs = []
-        if(!end||!this.db.isLocal(end))
-            txs = await this.api.getTxHistory({ address, num, start, end })
-        else
-            txs = this.db.getTxHistory({ address, num, start, end })
-        const res = this.db.getTxs(txs)
-        await this.downloadAndParseTx(txs)
-        if(num){
-            txs.splice(num,txs.length-num)
+        if (blockchain == 'bsv') {
+            if (!end || !this.db.isLocal(end))
+                txs = await this.bsv.getTxHistory({ address, num, start, end })
+            else
+                txs = this.db.getTxHistory({ address, num, start, end })
+            const res = this.db.getTxs(txs.c)
+            await this.downloadAndParseTx(txs.c)
+            await this.downloadAndParseTx(txs.u)
+            if (num) {
+                txs.c.splice(num, txs.c.length - num)
+            }
+            this.relateToAddress(address, txs.c, raw)
+            this.relateToAddress(address, txs.u, raw)
+            console.log(txs)
         }
-        this.relateToAddress(address,txs)
-        console.log(txs)
         return txs
     }
-    relateToAddress(address, txs) {
+    relateToAddress(address, txs, raw) {
         for (let tx of txs) {
             tx.amount = 0
-            tx.type = tx.main.from.find(ad=>ad.address===address)===undefined ? "income" : "spend"
+            tx.type = tx.main.from.find(ad => ad.address === address) === undefined ? "income" : "spend"
+            if (!raw) delete tx.raw
             if (tx.type === "spend") {
                 tx.main.from.forEach(ins => {
                     if (ins.address == address) {
@@ -42,7 +52,7 @@ class Crawler {
                         tx.amount -= out.value;
                     }
                 });
-                tx.amount -= tx.main.fee
+                //tx.amount -= tx.main.fee
             } else {
                 tx.main.to.forEach(out => {
                     if (out.address == address) {
@@ -60,10 +70,23 @@ class Crawler {
 
     async _download(txs) {
         let response;
+        let txids = [],i=0
         for (let tx of txs) {
+            i++
             if (tx.raw || tx.main) continue
-
-            let hex;
+            txids.push(tx.txid)
+            if(txids.length==20||i>=txs.length){
+                const res = await axios.post("https://api.whatsonchain.com/v1/bsv/main/txs/hex",{txids:txids})
+                if(res.data){
+                    console.log(res.data)
+                    for(const item of res.data){
+                        const t = txs.find(tx=>tx.txid==item.txid)
+                        if(t)t.raw = item.hex
+                    }
+                    txids = []
+                }
+            }
+           /* let hex;
             try {
                 console.log('woc--getting rawtx of:', tx.txid)
                 response = await axios.get(`https://api.whatsonchain.com/v1/bsv/main/tx/${tx.txid}/hex`)
@@ -78,16 +101,27 @@ class Crawler {
             } else {
                 console.log('success')
                 tx.raw = hex
-            }
+            }*/
 
         }
 
     }
     async _parseTx(txs) {
+        let utxos = {}
         for (let i = 0; i < txs.length; i++) {
             const tx = txs[i]
             if (tx.main) continue
-            txs[i] = await this.parser.parseRaw(tx)
+            const tx1 = bsv.Transaction(tx.raw)
+            for(const inp of tx1.inputs){
+                const txid = inp.prevTxId.toString('hex')
+                utxos[txid]={pos:inp.outputIndex}
+            }
+        }
+        await WOCAPI.getUtxoValue(utxos)
+        for (let i = 0; i < txs.length; i++) {
+            const tx = txs[i]
+            if (tx.main) continue
+            txs[i] = await this.parser.parseRaw(tx,utxos)
         }
     }
 }
