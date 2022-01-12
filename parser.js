@@ -45,7 +45,7 @@ class Parser{
                 addresses.add(address)
             value_out+=out._satoshis
         }
-        main.fee = value_in - value_out
+        txin.fee = value_in - value_out
         txin.main = main
         txin.dirty = true
         addresses.forEach(address=>txin.addresses+=address+";")
