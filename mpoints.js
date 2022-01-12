@@ -77,7 +77,10 @@ const crawler = new Crawler
 class mPoints {
   constructor(appID = "mpoints") {
     this.appID = appID;
-    this.dbPath = __dirname + "/data/txdb.db";
+    this.dbPath = __dirname + "/data/db1.db";
+    if (!fs.existsSync(this.dbPath)) {
+      fs.copyFileSync(__dirname + "/data/template/db1.db", this.dbPath);
+    }
   }
 
   start(port) {
