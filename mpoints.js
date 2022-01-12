@@ -128,7 +128,7 @@ class mPoints {
     })
     app.get("/v2/address/:address/history",async (req,res)=>{
       const address = req.params['address']
-      console.log("calling:",PATH_ADDRESS_HISTORY,"query:",req.query)
+      console.log("calling:",req.url,"query:",req.query)
       var data = await this.getAllTX2({
         address,
         num: Number(req.query.num),
