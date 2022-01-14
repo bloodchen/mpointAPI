@@ -112,6 +112,7 @@ class SensibleAPI{
     static async getTxHistory({ address, num, start, end }) {
         if(start&&start!=0) start--
         if(end&&end!=0) end++
+        if(start==0) start = 650000
         let url = `https://api.sensiblequery.com/address/${address}/history/tx?start=${start}&end=${end}&cursor=0&size=${num*2}`
         const res = await axios.get(url)
         if(res&&res.data.code==0){
