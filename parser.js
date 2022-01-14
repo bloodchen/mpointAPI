@@ -13,7 +13,7 @@ class Parser{
         const tx = bsv.Transaction(rawtx)
         txin.addresses = ""
         let addresses = new Set
-        let main = {from:[],to:[],fee:0}
+        let main = {from:[],to:[]}
         let value_in = 0,value_out=0
 
         for(const inp of tx.inputs){
