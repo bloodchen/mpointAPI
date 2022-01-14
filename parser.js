@@ -23,7 +23,7 @@ class Parser{
             try{
                 address = bsv.Address.fromScript(sc).toString()
             }catch(e){
-                address = false
+                address = ""
             }
             //const amount = await WOCAPI.getUtxoValue(preTxid,inp.outputIndex)
             const amount = utxos[preTxid].value
@@ -38,7 +38,7 @@ class Parser{
             try{
             address = bsv.Address.fromScript(sc).toString()
             }catch(e){
-                address = false
+                address = ""
             }
             main.to.push({address:address,value:out._satoshis})
             if(address)
