@@ -12,8 +12,8 @@ class Database {
     }
     setTx(item) {
         try {
-            const sql = "INSERT INTO txs (txid,block,raw,main,extra,ts,addresses) VALUES(?,?,?,?,?,?,?)"
-            this.db.prepare(sql).run(item.txid, item.block, item.raw, JSON.stringify(item.main), item.extra, item.ts, item.addresses)
+            const sql = "INSERT INTO txs (txid,block,raw,main,ts,addresses) VALUES(?,?,?,?,?,?,?)"
+            this.db.prepare(sql).run(item.txid, item.block, item.raw, JSON.stringify(item.main), item.ts, item.addresses)
         } catch (e) {
             console.error(e)
         }
