@@ -124,7 +124,7 @@ class SensibleAPI{
             }
             return txs
         }
-        return []
+        return {c:[],u:[]}
     }
 }
 class PlanAPI{
