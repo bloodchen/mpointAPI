@@ -110,7 +110,7 @@ class WOCAPI{
 }
 class SensibleAPI{
     static async getTxHistory({ address, num, start, end }) {
-        let url = `https://api.sensiblequery.com/address/${address}/history/tx?start=${start}&end=${end}&cursor=0&size=${num}`
+        let url = `https://api.sensiblequery.com/address/${address}/history/tx?start=${start}&end=${end}&cursor=0&size=${num*2}`
         const res = await axios.get(url)
         if(res&&res.data.code==0){
             const data = res.data.data
