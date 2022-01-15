@@ -4,11 +4,23 @@ const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensib
 
 class ARAPI{
     static async getTxHistory({ address, num, start, end }) {
+        let txs = await ARAPI._getTxHistory({address,num,start,end,type:'spend'})
+        const txs1 = await ARAPI._getTxHistory({address,num,start,end,type:'income'})
+        txs.c = txs.c.concat(txs1.c)
+        txs.u = txs.u.concat(txs1.u)
+        txs.c = txs.c.sort((first,second)=>second.ts>first.ts?1:-1)
+        if (num) {
+            txs.c.splice(num, txs.c.length - num)
+        }
+        console.log(txs)
+        return txs
+    }
+    static async _getTxHistory({ address, num, start, end,type }) {
         let block = {}
         if(start)block.min = start
         if(end) block.max = end
-        const query = `
-            query {transactions(recipients: ["${address}"]) {
+        let query = `
+            query Transactions($address:[String!]$1BLOCK$1NUM){transactions($TYPE: $address$BLOCK$NUM) {
               pageInfo {
                 hasNextPage
               }
@@ -24,6 +36,7 @@ class ARAPI{
                     value
                   }
                   block {
+                    height
                     timestamp
                   }
                   fee { winston }
@@ -34,9 +47,23 @@ class ARAPI{
           }}`;
           
         let url = "https://arweave.net/graphql",res = null
-        //const variables = {address:address,block:block}
+        const variables = {address:[address]}
+        if(block.min || block.max){
+            query = query.replace('$1BLOCK',',$block: BlockFilter')
+            query = query.replace('$BLOCK',",block:$block")
+            variables.block = block
+        }
+        if(num){
+            query = query.replace('$1NUM',',$first: Int')
+            query = query.replace('$NUM',",first:$first")
+            variables.first = num
+        }
+        query = query.replace('$TYPE',type=='spend'?'owners':'recipients')
+        query = query.replace('$NUM',"")
+        query = query.replace('$BLOCK',"")
+        query = query.replace('$1BLOCK',"")
         try{
-        res = await axios.post(url,{query},{
+        res = await axios.post(url,{query,variables},{
             headers: {
               'Content-Type': 'application/json',
               'Accept-Encoding': 'gzip, deflate, br',
@@ -45,12 +72,16 @@ class ARAPI{
           })
         }catch(e){
             console.log(e.response)
+            return {code:1,msg:e.response.data}
         }
-        let txs ={c:[],u:[]};
-        for(let i=res.data.length-1;i>=0;i--){
-            const item = res.data[i]
-            const tx = {txid:item.tx_hash,block:item.height}
-            item.height!=0 ? txs.c.push(tx):tx.u.push(tx)
+        let txs ={code:0,c:[],u:[]};
+        const data = res.data.data.transactions.edges
+        for(let i=0;i<data.length;i++){
+            const item = data[i]
+            const tx = {txid:item.node.id,block:item.node.block.height,ts:item.node.block.timestamp,fee:+item.node.fee.winston,type:type}
+            type=='spend' ? tx.main = {from:[address],to:[item.node.recipient]} : tx.main = {from:[item.node.owner.address],to:[address]}
+            tx.addresses = (address == item.node.recipient ? address +";"+item.node.owner.address : address + ";" + item.node.recipient)
+            tx.ts ? txs.c.push(tx):tx.u.push(tx)
         }
         return txs
     }
@@ -91,21 +122,6 @@ class WOCAPI{
             }
         }
         return null
-        /*const item = this.db && this.db.getTransaction(txid)
-        if(item){
-            return item.to[outPos].value
-        }else{
-            console.log("getting UTXO value of:",outPos,"@",txid)
-            const url = "https://api.whatsonchain.com/v1/bsv/main/tx/hash/"+txid
-            let response = await axios.get(url)
-            if(response.data){
-                console.log("success")
-                return response.data.vout[outPos].value*1e8
-            }else{
-                console.error("fail")
-            }
-        }
-        return null*/
     }
 }
 class SensibleAPI{
