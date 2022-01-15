@@ -38,7 +38,7 @@ class Crawler {
         }
         if (blockchain == 'ar') {
             if (!end || !this.db.isLocal(end,blockchain)){
-                txs = await this.bsv.getTxHistory({ address, num, start, end })
+                txs = await this.ar.getTxHistory({ address, num, start, end })
             }
             else
                 txs = this.db.getTxHistory({ address, num, start, end, blockchain })
