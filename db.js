@@ -34,7 +34,7 @@ class Database {
         return { c: res }
     }
     isLocal(block,blockchain='bsv') {
-        let sql = "SELECT * from txs where block = ?"
+        let sql = "SELECT * from txs where block > ?"
         if(blockchain=='ar') sql = sql.replace('txs','artx')
         const res = this.db.prepare(sql).get(block)
         return res != null
