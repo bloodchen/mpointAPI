@@ -116,9 +116,6 @@ class WOCAPI{
                     console.log(res.data)
                     for(const item of res.data){
                         const uu = utxos.filter(u=>u.txid ==item.txid)
-                        if(uu.length>1){
-                            console.log("found")
-                        }
                         uu.forEach(u=>u.value=Math.round(item.vout[u.pos].value*1e8))
                     }
                 }

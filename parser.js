@@ -15,9 +15,9 @@ class Parser{
         let addresses = new Set
         let main = {from:[],to:[]}
         let value_in = 0,value_out=0
-        if(txin.txid=="ebe2748696387c030983fbf4f279ba62a8aec7e7c61fdf64d593e0d7d236c186"){
-            console.log("found")
-        }
+       // if(txin.txid=="ebe2748696387c030983fbf4f279ba62a8aec7e7c61fdf64d593e0d7d236c186"){
+           // console.log("found")
+       // }
         for(const inp of tx.inputs){
             let address = null
             const preTxid = inp.prevTxId.toString('hex')
@@ -51,7 +51,7 @@ class Parser{
         }
         txin.fee = value_in - value_out
         if(txin.fee<0){
-            console.log("found")
+            console.log("found negative fee")
         }
         txin.main = main
         txin.dirty = true
