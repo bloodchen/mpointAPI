@@ -15,7 +15,9 @@ class Parser{
         let addresses = new Set
         let main = {from:[],to:[]}
         let value_in = 0,value_out=0
-
+        if(txin.txid=="ebe2748696387c030983fbf4f279ba62a8aec7e7c61fdf64d593e0d7d236c186"){
+            console.log("found")
+        }
         for(const inp of tx.inputs){
             let address = null
             const preTxid = inp.prevTxId.toString('hex')
@@ -26,7 +28,9 @@ class Parser{
                 address = ""
             }
             //const amount = await WOCAPI.getUtxoValue(preTxid,inp.outputIndex)
-            const amount = utxos[preTxid].value
+            let amount = 0
+            const utxo = utxos.find(u=>(u.txid==preTxid)&&(u.pos==inp.outputIndex))
+            if(utxo)amount = utxo.value
             main.from.push({address:address,value:amount})
             if(address)
                 addresses.add(address)
@@ -46,6 +50,9 @@ class Parser{
             value_out+=out._satoshis
         }
         txin.fee = value_in - value_out
+        if(txin.fee<0){
+            console.log("found")
+        }
         txin.main = main
         txin.dirty = true
         addresses.forEach(address=>txin.addresses+=address+";")

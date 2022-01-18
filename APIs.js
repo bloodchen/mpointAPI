@@ -99,26 +99,30 @@ class WOCAPI{
         return txs
     }
     static async getUtxoValue(utxos){
-        let txids = [],i=0
-        const length = Object.keys(utxos).length
-        for(let txid in utxos){
+        let txids = new Set,i=0
+        const length = utxos.length
+        for(let utxo of utxos){
+            const txid  = utxo.txid
             i++
             const item = this.db && this.db.getTransaction(txid)
             if(item){
-                utxos[txid].value = item.to[utxos[txid].pos].value
+                utxo.value = item.to[utxo.pos].value
                 continue
             }
-            txids.push(txid)
-            if(txids.length==20||i>=length){
-                const res = await axios.post("https://api.whatsonchain.com/v1/bsv/main/txs",{txids:txids})
+            txids.add(txid)
+            if(txids.size==20||i>=length){
+                const res = await axios.post("https://api.whatsonchain.com/v1/bsv/main/txs",{txids:Array.from(txids)})
                 if(res.data){
                     console.log(res.data)
                     for(const item of res.data){
-                        const t = utxos[item.txid]
-                        if(t)t.value = Math.floor(item.vout[t.pos].value*1e8)
+                        const uu = utxos.filter(u=>u.txid ==item.txid)
+                        if(uu.length>1){
+                            console.log("found")
+                        }
+                        uu.forEach(u=>u.value=Math.round(item.vout[u.pos].value*1e8))
                     }
                 }
-                txids = []
+                txids.clear()
             }
         }
         return null
@@ -137,7 +141,10 @@ class SensibleAPI{
             for(let i=0;i<data.length;i++){
                 const item = data[i]
                 const tx = {txid:item.txid,block:item.height,ts:item.timestamp}
-                item.height!=4294967295 ? txs.c.push(tx):(tx.block=-1,txs.u.push(tx))
+                if(item.height!=4294967295)  txs.c.push(tx)
+                else {
+                    tx.block=-1;txs.u.push(tx)
+                }
             }
             return txs
         }

@@ -30,6 +30,7 @@ class Crawler {
             const res = this.db.getTxs(txs.c, blockchain)
             await this.downloadAndParseTx(txs.c)
             await this.downloadAndParseTx(txs.u)
+            this.db.saveTxs(txs.c)
             if (num) {
                 txs.c.splice(num, txs.c.length - num)
             }
@@ -77,7 +78,7 @@ class Crawler {
         if(!txs)return
         await this._download(txs)
         await this._parseTx(txs)
-        this.db.saveTxs(txs)
+        
     }
 
     async _download(txs) {
@@ -103,14 +104,14 @@ class Crawler {
     }
     async _parseTx(txs) {
         if(!txs)return
-        let utxos = {}
+        let utxos = []
         for (let i = 0; i < txs.length; i++) {
             const tx = txs[i]
             if (tx.main) continue
             const tx1 = bsv.Transaction(tx.raw)
             for (const inp of tx1.inputs) {
                 const txid = inp.prevTxId.toString('hex')
-                utxos[txid] = { pos: inp.outputIndex }
+                utxos.push({txid:txid, pos: inp.outputIndex})
             }
         }
         await WOCAPI.getUtxoValue(utxos)
