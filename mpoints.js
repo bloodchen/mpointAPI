@@ -645,8 +645,10 @@ class mPoints {
           }
         };
         //console.log(config);
+        //const res = await nbpay.send(config);
         const res = await nbpay.send(config);
-        return {code:res.err?-1:0,message:res.err}
+        //console.log(res.tx.toString())
+        return {code:res.err?-1:0,message:res.err,...res}
     
   }
   async util_payAddress(address, amount, appdata, comments, appid) {
