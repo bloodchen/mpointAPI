@@ -86,8 +86,8 @@ class Crawler {
         let txids = [], i = 0
         for (let tx of txs) {
             i++
-            if (tx.raw || tx.main) continue
-            txids.push(tx.txid)
+            if (!tx.raw && !tx.main) 
+                txids.push(tx.txid)
             if (txids.length == 20 || i >= txs.length) {
                 const res = await axios.post("https://api.whatsonchain.com/v1/bsv/main/txs/hex", { txids: txids })
                 if (res.data) {
