@@ -622,6 +622,7 @@ class mPoints {
     return config;
   }
   async util_dataPay(data) {
+        log("calling datapay:",data)
         const jsData = data; //JSON.parse(data);
         let payKey = "";
         if (jsData.key) {
@@ -644,10 +645,9 @@ class mPoints {
             feeb: 0.5
           }
         };
-        //console.log(config);
-        //const res = await nbpay.send(config);
+        
         const res = await nbpay.send(config);
-        //console.log(res.tx.toString())
+        log("datapay:",res)
         return {code:res.err?-1:0,message:res.err,...res}
     
   }
