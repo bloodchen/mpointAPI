@@ -123,7 +123,7 @@ class mPoints {
     })
     app.get("/v2/address/:address/prefetch",(req,res)=>{
       const address = req.params['address']
-      this.preFetchAddress({address,blockchain:req.query.blockchain})
+      this.preFetchAddress({address,chain:req.query.chain})
       res.json({code:0,msg:"ok"})
     })
     app.get("/v2/address/:address/history",async (req,res)=>{
@@ -136,7 +136,7 @@ class mPoints {
         start: Number(req.query.start),
         end: Number(req.query.end),
         skip: Number(req.query.skip),
-        blockchain:req.query.blockchain
+        chain:req.query.chain
       });
       res.json(data)
     })
@@ -473,10 +473,10 @@ class mPoints {
     }
     return allItems;
   }
-  async preFetchAddress({address,blockchain='bsv'}){
-    crawler.preFetch({address,blockchain})
+  async preFetchAddress({address,chain='bsv'}){
+    crawler.preFetch({address,chain})
   }
-  async getAllTX2({ address, num, sort, start, end, skip,blockchain }){
+  async getAllTX2({ address, num, sort, start, end, skip,chain }){
     if(!address)return null;
 
     address = address.trim();
@@ -486,7 +486,7 @@ class mPoints {
     if (isNaN(start)) start = 0;
     if (isNaN(end)) end = 0;
     if (isNaN(skip)) skip = 0;
-    return await crawler.getTxHistory({address,num,start,end,blockchain})
+    return await crawler.getTxHistory({address,num,start,end,chain})
   }
   async getAllTX({ address, num, sort, start, end, skip }) {
     if(!address)return null;

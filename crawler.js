@@ -15,19 +15,19 @@ class Crawler {
         this.allAddress = this.db.getAllAddr()
 
     }
-    async preFetch({ address, blockchain }) {
-        this.getTxHistory({ address, num: 1000, blockchain })
+    async preFetch({ address, chain }) {
+        this.getTxHistory({ address, num: 1000, chain })
     }
-    async getTxHistory({ address, num = 10, start = BLOCK_MIN, end = 0, raw = false, blockchain = 'bsv' }) {
+    async getTxHistory({ address, num = 10, start = BLOCK_MIN, end = 0, raw = false, chain = 'bsv' }) {
         let txs = {}
-        if (blockchain == 'bsv') {
-            if (!end || !this.db.isLocal(end,blockchain)){
+        if (chain == 'bsv') {
+            if (!end || !this.db.isLocal(end,chain)){
                 txs = await this.bsv.getTxHistory({ address, num, start, end })
-                txs.blockchain = blockchain
+                txs.chain = chain
             }
             else
-                txs = this.db.getTxHistory({ address, num, start, end, blockchain })            
-            const res = this.db.getTxs(txs.c, blockchain)
+                txs = this.db.getTxHistory({ address, num, start, end, chain })            
+            const res = this.db.getTxs(txs.c, chain)
             await this.downloadAndParseTx(txs.c)
             await this.downloadAndParseTx(txs.u)
             this.db.saveTxs(txs.c)
@@ -37,14 +37,14 @@ class Crawler {
             this.relateToAddress(address, txs.c, raw)
             this.relateToAddress(address, txs.u, raw)
         }
-        if (blockchain == 'ar') {
-            if (!end || !this.db.isLocal(end,blockchain)){
+        if (chain == 'ar') {
+            if (!end || !this.db.isLocal(end,chain)){
                 txs = await this.ar.getTxHistory({ address, num, start, end })
             }
             else
-                txs = this.db.getTxHistory({ address, num, start, end, blockchain })
+                txs = this.db.getTxHistory({ address, num, start, end, chain })
         }
-        txs.blockchain = blockchain
+        txs.chain = chain
         return txs
     }
     relateToAddress(address, txs, raw) {
