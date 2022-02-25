@@ -1,9 +1,10 @@
 "use strict";
 
 const process = require("process");
-const nbpay = require("nbpay");
-const bsv = nbpay.bsv;
+//const nbpay = require("nbpay");
+//const bsv = nbpay.bsv;
 const axios = require("axios");
+const CoinFly = require('coinfly');
 const fs = require("fs");
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -14,7 +15,7 @@ const db = require("./db");
 const crypt = require("./txtCrypt.js");
 
 const SQDB = require("better-sqlite3-helper");
-const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
+//const { SensibleFT, API_NET, API_TARGET, SensibleApi, Wallet } = require("sensible-sdk");
 
 const Hot_privateKey = process.env.hotkey1
   ? crypt.decode(process.env.hotkey1, ": P=4m+c$MZmWQxYjr")
@@ -39,7 +40,7 @@ const ERROR_NO = 0;
 const ERROR_TOOSMALL = 1;
 const ERROR_PAY = 2;
 
-nbpay.auto_config();
+//nbpay.auto_config();
 
 //获取访问id
 function getClientIp(req) {
@@ -72,6 +73,7 @@ let ignoreDetail = false;
 
 const Crawler = require("./crawler");
 const req = require("express/lib/request");
+const coinflyMin = require("coinfly");
 const crawler = new Crawler
 
 class mPoints {
@@ -92,16 +94,7 @@ class mPoints {
 
     app.get(PATH_ADDRESS, async (req, res) => {
       console.log("calling:",PATH_ADDRESS,"query:",req.query)
-      var data = await mPoints.getAddressInfo(req.query.address);
-      res.json(data);
-    })
-    app.get(PATH_TOPUP, async (req, res) => {
-      console.log("calling:",PATH_TOPUP,"query:",req.query)
-      const query = req.query;
-      var data = await this.topUpAddress(
-        query.address,
-        Number(query.amount)
-      );
+      var data = await mPoints.getAddressInfo(req.query.address,req.query.chain);
       res.json(data);
     })
     app.get(PATH_TX_LOOKUP, (req, res) => {
@@ -164,7 +157,8 @@ class mPoints {
         query.amount,
         query.appdata,
         query.comments,
-        query.appid
+        query.appid,
+        query.chain
       );
       res.json(data);
     })
@@ -184,7 +178,7 @@ class mPoints {
       var data = await this.util_dataPay(req.body);
       res.json(data);
     })
-    app.post(PATH_UTIL_DECODE, (req, res) => {
+/*    app.post(PATH_UTIL_DECODE, (req, res) => {
       console.log("calling:",PATH_UTIL_DECODE,"body:",req.body)
       const obj = req.body
       const rawtx = obj.rawtx;
@@ -204,7 +198,7 @@ class mPoints {
         out.address = sc.toAddress().toString();
       });
       res.json(txData);
-    })
+    }) */
 
 
     process.on("SIGINT", function () {
@@ -256,12 +250,11 @@ class mPoints {
       }
     }
 
-  static async getAddressInfo(address) {
-      var obj = await this.getAddressInfo_from_woc_(address);
-      if(obj != null) return obj;
-    obj = await this.getAddressInfo_from_mtc_(address);
-    if (obj != null) return obj;
-    return null;
+  static async getAddressInfo(address,chain) {
+    if(!chain)chain='bsv'
+    const lib = await CoinFly.create(chain)
+    if(!lib) return null
+    return await lib.getBalance(address)
   }
   setTxData(obj, isDetail) {
     console.log("setTxData");
@@ -640,53 +633,48 @@ class mPoints {
         }
         const config = {
           pay: {
-            key: bsv.PrivateKey.fromWIF(payKey),
+            key: payKey,
             to: jsData.to,
             feeb: 0.5
           }
         };
-        
-        const res = await nbpay.send(config);
+        const lib = await CoinFly.create('bsv')
+        const res = await lib.send(config);
         log("datapay:",res)
         return {code:res.err?-1:0,message:res.err,...res}
     
   }
-  async util_payAddress(address, amount, appdata, comments, appid) {
+  async util_payAddress(address, amount, appdata, comments, appid,chain) {
     if (address == "" || address == null || amount == null) return null;
     let payKey = Hot_privateKey;
+    if(!appid)appid="general"
     if (appid == "mmgrid") {
       payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
     }
+    if(chain=='ar'){
+      payKey = process.env.arKey
+    }
     console.log(payKey)
+    if(!payKey){
+      console.error("No Paykey for:",chain)
+    }
     var payObj = {
       privateKey: payKey,
       address: address,
       amount: amount,
       appdata: appdata,
-      comments: comments
+      comments: comments,
+      appid:appid,
+      chain:chain
     };
     console.log("payObj:", payObj);
     return await this.payUsingKey_(payObj);
   }
-  /**
-   * @param  {} address: address to topup
-   * @param  {} amount: number of sat
-   * @param  {} comments=""
-   */
-  async topUpAddress(address, amount, appdata = "", comments = "") {
-    var payObj = {
-      privateKey: Hot_privateKey,
-      address: address,
-      amount: amount,
-      appdata: appdata,
-      comments: comments
-    };
-    return await this.payUsingKey_(payObj);
-  }
+
 
   async payUsingKey_(payObj) {
     
-      var privateKey = payObj.privateKey,
+/*      var privateKey = payObj.privateKey,
         address = payObj.address,
         amount = parseInt(payObj.amount, 10),
         appdata = payObj.appdata,
@@ -704,14 +692,31 @@ class mPoints {
         address: address,
         amount: amount,
         privateKey: pKey
+      };*/
+      //var config = this.generateConfig(obj);
+      //console.log(obj);
+      var config = {
+        data: [PROTOCOL_ID,payObj.appid,payObj.appdata,payObj.comments],
+        pay: {
+          key: payObj.privateKey,
+          feeb: 0.5,
+          to: [
+            {
+              address: payObj.address,
+              value: +payObj.amount
+            }
+          ]
+        }
       };
-      var config = this.generateConfig(obj);
-      console.log(obj);
-      if (amount < 200) {
+      console.log(config.data)
+      if (+payObj.amount < 200) {
         resolve({ code: ERROR_TOOSMALL, msg: "cannot topup small amount" });
         return;
       }
-      const res = await nbpay.send(config);
+      const chain = payObj.chain?payObj.chain:'bsv'
+      const lib = await CoinFly.create(chain)
+      const res = await lib.send(config);
+      console.log(res)
       delete payObj.privateKey;
       const ret = {code:res.err?-1:0,txid:res.txid,message:res.err}
       log(res.err?"Failed:":"Success Payment Obj:",JSON.stringify(payObj),JSON.stringify(ret));

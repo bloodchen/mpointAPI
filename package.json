@@ -14,16 +14,14 @@
     "better-sqlite3": "^7.4.6",
     "better-sqlite3-helper": "^3.1.0",
     "body-parser": "^1.19.0",
-    "bsv": "^1.2.0",
+    "coinfly": "^1.0.38",
     "cors": "^2.8.5",
+    "bsv":"^1.5.6",
     "dotenv": "^8.2.0",
     "event-stream": "^4.0.1",
     "express": "^4.17.1",
     "minimist": "^1.2.5",
-    "mysql": "^2.18.1",
-    "nbpay": "^1.0.19",
-    "node-json-db": "^1.1.0",
-    "sensible-sdk": "^7.3.1"
+    "node-json-db": "^1.1.0"
   },
   "repository": {
     "url": "https://glitch.com/edit/#!/hello-express"
