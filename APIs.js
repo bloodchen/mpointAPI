@@ -78,9 +78,10 @@ class ARAPI{
         const data = res.data.data.transactions.edges
         for(let i=0;i<data.length;i++){
             const item = data[i]
-            const tx = {txid:item.node.id,block:item.node.block.height,ts:item.node.block.timestamp,fee:+item.node.fee.winston,type:type}
-            type=='spend' ? tx.main = {from:[address],to:[item.node.recipient]} : tx.main = {from:[item.node.owner.address],to:[address]}
+            const tx = {txid:item.node.id,block:item.node.block.height,ts:item.node.block.timestamp,fee:Math.floor(+item.node.fee.winston/10000),type:type}
+            type=='spend' ? tx.main = {from:[{address}],to:[{address:item.node.recipient}]} : tx.main = {from:[{address:item.node.owner.address}],to:[{address}]}
             tx.addresses = (address == item.node.recipient ? address +";"+item.node.owner.address : address + ";" + item.node.recipient)
+            tx.amount = Math.floor(+item.node.quantity.winston/10000)
             tx.ts ? txs.c.push(tx):tx.u.push(tx)
         }
         return txs

@@ -254,7 +254,8 @@ class mPoints {
     if(!chain)chain='bsv'
     const lib = await CoinFly.create(chain)
     if(!lib) return null
-    return await lib.getBalance(address)
+    const ret = {balance:await lib.getBalance(address)}
+    return ret
   }
   setTxData(obj, isDetail) {
     console.log("setTxData");
