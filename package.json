@@ -14,7 +14,7 @@
     "better-sqlite3": "^7.4.6",
     "better-sqlite3-helper": "^3.1.0",
     "body-parser": "^1.19.0",
-    "coinfly": "^1.0.38",
+    "coinfly": "latest",
     "cors": "^2.8.5",
     "bsv":"^1.5.6",
     "dotenv": "^8.2.0",
