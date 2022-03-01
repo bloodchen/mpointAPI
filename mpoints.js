@@ -653,7 +653,7 @@ class mPoints {
       payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
     }
     if(chain=='ar'){
-      payKey = process.env.arKey
+      payKey = process.env.arkey
     }
     console.log(payKey)
     if(!payKey){
