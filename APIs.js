@@ -66,7 +66,7 @@ class ARAPI{
         res = await axios.post(url,{query,variables},{
             headers: {
               'Content-Type': 'application/json',
-              'Accept-Encoding': 'gzip, deflate, br',
+              'Accept-Encoding': 'gzip, deflate',
               'Origin': 'https://arweave.net'
             }
           })

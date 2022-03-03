@@ -675,27 +675,6 @@ class mPoints {
 
   async payUsingKey_(payObj) {
     
-/*      var privateKey = payObj.privateKey,
-        address = payObj.address,
-        amount = parseInt(payObj.amount, 10),
-        appdata = payObj.appdata,
-        comments = payObj.comments,
-        appid = payObj.appid;
-      var pKey = bsv.PrivateKey.fromWIF(privateKey);
-      var aid = appid;
-      if (typeof aid == "undefined") aid = this.appID;
-      if (typeof appdata == "undefined") appdata = "";
-      if (typeof comments == "undefined") comments = "";
-      var sAppdata = JSON.stringify({ rtx: "this", aData: appdata });
-      var sUserdata = JSON.stringify({ comments: comments });
-      var obj = {
-        data: [PROTOCOL_ID, aid, sAppdata, sUserdata],
-        address: address,
-        amount: amount,
-        privateKey: pKey
-      };*/
-      //var config = this.generateConfig(obj);
-      //console.log(obj);
       var config = {
         data: [PROTOCOL_ID,payObj.appid,payObj.appdata,payObj.comments],
         pay: {
