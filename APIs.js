@@ -143,7 +143,9 @@ class SensibleAPI{
                 const tx = {txid:item.txid,block:item.height,ts:item.timestamp}
                 if(item.height!=4294967295)  txs.c.push(tx)
                 else {
-                    tx.block=-1;txs.u.push(tx)
+                    tx.block=-1;
+                    tx.ts = Math.floor(DateTime.now()/1000)
+                    txs.u.push(tx)
                 }
             }
             return txs
