@@ -72,8 +72,7 @@ function log(...args) {
 let ignoreDetail = false;
 
 const Crawler = require("./crawler");
-const req = require("express/lib/request");
-const coinflyMin = require("coinfly");
+
 const crawler = new Crawler
 
 class mPoints {
@@ -93,17 +92,17 @@ class mPoints {
     app.use(bodyParser.urlencoded({ limit: '50mb', extended: false, parameterLimit: 50000 }));
 
     app.get(PATH_ADDRESS, async (req, res) => {
-      console.log("calling:",PATH_ADDRESS,"query:",req.query)
-      var data = await mPoints.getAddressInfo(req.query.address,req.query.chain);
+      console.log("calling:", PATH_ADDRESS, "query:", req.query)
+      var data = await mPoints.getAddressInfo(req.query.address, req.query.chain);
       res.json(data);
     })
     app.get(PATH_TX_LOOKUP, (req, res) => {
-      console.log("calling:",PATH_TX_LOOKUP,"query:",req.query)
+      console.log("calling:", PATH_TX_LOOKUP, "query:", req.query)
       var data = this.getTransaction(query.txid);
       res.json(data);
     })
     app.get(PATH_TX_ALL, async (req, res) => {
-      console.log("calling:",PATH_TX_ALL,"query:",req.query)
+      console.log("calling:", PATH_TX_ALL, "query:", req.query)
       var data = await this.getAllTX({
         address: req.query.address,
         num: Number(req.query.num),
@@ -114,14 +113,14 @@ class mPoints {
       });
       res.json(data);
     })
-    app.get("/v2/address/:address/prefetch",(req,res)=>{
+    app.get("/v2/address/:address/prefetch", (req, res) => {
       const address = req.params['address']
-      this.preFetchAddress({address,chain:req.query.chain})
-      res.json({code:0,msg:"ok"})
+      this.preFetchAddress({ address, chain: req.query.chain })
+      res.json({ code: 0, msg: "ok" })
     })
-    app.get("/v2/address/:address/history",async (req,res)=>{
+    app.get("/v2/address/:address/history", async (req, res) => {
       const address = req.params['address']
-      console.log("calling:",req.url,"query:",req.query)
+      console.log("calling:", req.url, "query:", req.query)
       var data = await this.getAllTX2({
         address,
         num: Number(req.query.num),
@@ -129,12 +128,12 @@ class mPoints {
         start: Number(req.query.start),
         end: Number(req.query.end),
         skip: Number(req.query.skip),
-        chain:req.query.chain
+        chain: req.query.chain
       });
       res.json(data)
     })
     app.get(PATH_TX_MAIN, async (req, res) => {
-      console.log("calling:",PATH_TX_MAIN,"query:",req.query)
+      console.log("calling:", PATH_TX_MAIN, "query:", req.query)
       ignoreDetail = true;
       var data = await this.getAllTX({
         address: req.query.address,
@@ -148,7 +147,7 @@ class mPoints {
       res.json(data)
     })
     app.get(PATH_UTIL_PAY, async (req, res) => {
-      console.log("calling:",PATH_UTIL_PAY,"query:",req.query)
+      console.log("calling:", PATH_UTIL_PAY, "query:", req.query)
       const IP = getClientIp(req);
       const query = req.query;
       console.log("IP:", IP);
@@ -163,42 +162,29 @@ class mPoints {
       res.json(data);
     })
     app.get(PATH_TX_DEL, (req, res) => {
-      console.log("calling:",PATH_TX_DEL,"query:",req.query)
+      console.log("calling:", PATH_TX_DEL, "query:", req.query)
       var data = this.delTransaction(req.query.txid);
       res.json(data);
     })
     app.post(PATH_TX_SET, (req, res) => {
-      console.log("calling:",PATH_TX_DEL,"body:",req.body)
+      console.log("calling:", PATH_TX_DEL, "body:", req.body)
       let ret = this.setTxData(req.body, true);
       if (ret) res.end("success");
       else res.end("error, no txid");
     })
     app.post(PATH_UTIL_DATAPAY, async (req, res) => {
-      console.log("calling:",PATH_TX_DEL,"body:",req.body)
+      console.log("calling:", PATH_TX_DEL, "body:", req.body)
       var data = await this.util_dataPay(req.body);
       res.json(data);
     })
-/*    app.post(PATH_UTIL_DECODE, (req, res) => {
-      console.log("calling:",PATH_UTIL_DECODE,"body:",req.body)
-      const obj = req.body
-      const rawtx = obj.rawtx;
-      if(!rawtx){
-        res.end("No rawtx")
-        return;
-      }
-      const tx = bsv.Transaction(rawtx);
-      let txData = tx.toJSON();
-      txData.inputs.forEach(inp => {
-        const sc = new bsv.Script.fromString(inp.script);
-        inp.address = sc.toAddress().toString();
-      });
-
-      txData.outputs.forEach(out => {
-        const sc = new bsv.Script.fromString(out.script);
-        out.address = sc.toAddress().toString();
-      });
-      res.json(txData);
-    }) */
+    app.get('/test', async (req, res) => {
+      const lib = await CoinFly.create('ar')
+      const pubKey = await lib.getPublicKey(process.env.arkey)
+      const address = await lib.getAddress(pubKey)
+      console.log(pubKey)
+      console.log(address)
+      res.end(address)
+    })
 
 
     process.on("SIGINT", function () {
@@ -214,47 +200,47 @@ class mPoints {
 
   }
   static async getAddressInfo_from_mtc_(address) {
-      if(!address) return null;
-      try {
-        const url =
-          "https://api.mattercloud.net/api/v3/main/address/" +
-          address +
-          "/balance";
-        const response = await axios.get(url);
-        //console.log(response);
-        const obj = {
-          balance: response.confirmed + response.unconfirmed
-        };
-        return obj;
-      } catch(err) {
-        console.log(err);
-        return null;
-      }
+    if (!address) return null;
+    try {
+      const url =
+        "https://api.mattercloud.net/api/v3/main/address/" +
+        address +
+        "/balance";
+      const response = await axios.get(url);
+      //console.log(response);
+      const obj = {
+        balance: response.confirmed + response.unconfirmed
+      };
+      return obj;
+    } catch (err) {
+      console.log(err);
+      return null;
     }
+  }
   static async getAddressInfo_from_woc_(address) {
-      if(!address) return null;
-      try {
-        const url =
-          "https://api.whatsonchain.com/v1/bsv/main/address/" +
-          address +
-          "/balance";
-        const response = await axios.get(url);
-        //console.log(response);
-        const obj = {
-          balance: response.data.confirmed + response.data.unconfirmed
-        };
-        return obj;
-      } catch(err) {
-        console.log(err);
-        return null;
-      }
+    if (!address) return null;
+    try {
+      const url =
+        "https://api.whatsonchain.com/v1/bsv/main/address/" +
+        address +
+        "/balance";
+      const response = await axios.get(url);
+      //console.log(response);
+      const obj = {
+        balance: response.data.confirmed + response.data.unconfirmed
+      };
+      return obj;
+    } catch (err) {
+      console.log(err);
+      return null;
     }
+  }
 
-  static async getAddressInfo(address,chain) {
-    if(!chain)chain='bsv'
+  static async getAddressInfo(address, chain) {
+    if (!chain) chain = 'bsv'
     const lib = await CoinFly.create(chain)
-    if(!lib) return null
-    const ret = {balance:await lib.getBalance(address)}
+    if (!lib) return null
+    const ret = { balance: await lib.getBalance(address) }
     return ret
   }
   setTxData(obj, isDetail) {
@@ -335,7 +321,7 @@ class mPoints {
     }
     return null;
   }
-  
+
   async getOutputFromInput(input) {
     const txid = input.h;
     const pos = input.i;
@@ -386,7 +372,7 @@ class mPoints {
     for (let i = 0; i < tx.in.length; i++) {
       let inn = tx.in[i];
       const out = await this.getOutputFromInput(inn.e);
-      if (out&&out.e) {
+      if (out && out.e) {
         item._in.push({ a: out.e.a, v: out.e.v });
         //console.log(out);
         totalInFee += out.e.v;
@@ -394,7 +380,7 @@ class mPoints {
     }
     for (let i = 0; i < tx.out.length; i++) {
       let o = tx.out[i];
-      if(o.e){
+      if (o.e) {
         item._out.push({ a: o.e.a, v: o.e.v });
         totalOutFee += o.e.v;
       }
@@ -467,11 +453,11 @@ class mPoints {
     }
     return allItems;
   }
-  async preFetchAddress({address,chain='bsv'}){
-    crawler.preFetch({address,chain})
+  async preFetchAddress({ address, chain = 'bsv' }) {
+    crawler.preFetch({ address, chain })
   }
-  async getAllTX2({ address, num, sort, start, end, skip,chain }){
-    if(!address)return null;
+  async getAllTX2({ address, num, sort, start, end, skip, chain }) {
+    if (!address) return null;
 
     address = address.trim();
     if (!address) return null;
@@ -480,10 +466,10 @@ class mPoints {
     if (isNaN(start)) start = 0;
     if (isNaN(end)) end = 0;
     if (isNaN(skip)) skip = 0;
-    return await crawler.getTxHistory({address,num,start,end,chain})
+    return await crawler.getTxHistory({ address, num, start, end, chain })
   }
   async getAllTX({ address, num, sort, start, end, skip }) {
-    if(!address)return null;
+    if (!address) return null;
 
     address = address.trim();
     if (!address) return null;
@@ -616,48 +602,48 @@ class mPoints {
     return config;
   }
   async util_dataPay(data) {
-        log("calling datapay:",data)
-        const jsData = data; //JSON.parse(data);
-        let payKey = "";
-        if (jsData.key) {
-          const buf = Buffer.from(jsData.key, "base64");
-          payKey = buf.toString();
-          console.log(payKey);
-        } else {
-          payKey = Hot_privateKey;
-        }
-        if (jsData.appid && jsData.appid == "mmgrid") {
-          payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
-        }
-        if (jsData.appid && jsData.appid == "mmgrid1") {
-          payKey = crypt.decode(process.env.mmkey1, ": P=4==m+c$MZmWQxYjr");
-        }
-        const config = {
-          pay: {
-            key: payKey,
-            to: jsData.to,
-            feeb: 0.5
-          }
-        };
-        const lib = await CoinFly.create('bsv')
-        const res = await lib.send(config);
-        log("datapay:",res)
-        return {code:res.err?-1:0,message:res.err,...res}
-    
+    log("calling datapay:", data)
+    const jsData = data; //JSON.parse(data);
+    let payKey = "";
+    if (jsData.key) {
+      const buf = Buffer.from(jsData.key, "base64");
+      payKey = buf.toString();
+      console.log(payKey);
+    } else {
+      payKey = Hot_privateKey;
+    }
+    if (jsData.appid && jsData.appid == "mmgrid") {
+      payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
+    }
+    if (jsData.appid && jsData.appid == "mmgrid1") {
+      payKey = crypt.decode(process.env.mmkey1, ": P=4==m+c$MZmWQxYjr");
+    }
+    const config = {
+      pay: {
+        key: payKey,
+        to: jsData.to,
+        feeb: 0.5
+      }
+    };
+    const lib = await CoinFly.create('bsv')
+    const res = await lib.send(config);
+    log("datapay:", res)
+    return { code: res.err ? -1 : 0, message: res.err, ...res }
+
   }
-  async util_payAddress(address, amount, appdata, comments, appid,chain) {
+  async util_payAddress(address, amount, appdata, comments, appid, chain) {
     if (address == "" || address == null || amount == null) return null;
     let payKey = Hot_privateKey;
-    if(!appid)appid="general"
+    if (!appid) appid = "general"
     if (appid == "mmgrid") {
       payKey = crypt.decode(process.env.mmkey, ": P=4==m+c$MZmWQxYjr");
     }
-    if(chain=='ar'){
+    if (chain == 'ar') {
       payKey = process.env.arkey
     }
     console.log(payKey)
-    if(!payKey){
-      console.error("No Paykey for:",chain)
+    if (!payKey) {
+      console.error("No Paykey for:", chain)
     }
     var payObj = {
       privateKey: payKey,
@@ -665,8 +651,8 @@ class mPoints {
       amount: amount,
       appdata: appdata,
       comments: comments,
-      appid:appid,
-      chain:chain
+      appid: appid,
+      chain: chain
     };
     console.log("payObj:", payObj);
     return await this.payUsingKey_(payObj);
@@ -674,33 +660,33 @@ class mPoints {
 
 
   async payUsingKey_(payObj) {
-    
-      var config = {
-        data: [PROTOCOL_ID,payObj.appid,payObj.appdata,payObj.comments],
-        pay: {
-          key: payObj.privateKey,
-          feeb: 0.5,
-          to: [
-            {
-              address: payObj.address,
-              value: +payObj.amount
-            }
-          ]
-        }
-      };
-      console.log(config.data)
-      if (+payObj.amount < 200) {
-        resolve({ code: ERROR_TOOSMALL, msg: "cannot topup small amount" });
-        return;
+
+    var config = {
+      data: [PROTOCOL_ID, payObj.appid, payObj.appdata, payObj.comments],
+      pay: {
+        key: payObj.privateKey,
+        feeb: 0.5,
+        to: [
+          {
+            address: payObj.address,
+            value: +payObj.amount
+          }
+        ]
       }
-      const chain = payObj.chain?payObj.chain:'bsv'
-      const lib = await CoinFly.create(chain)
-      const res = await lib.send(config);
-      console.log(res)
-      delete payObj.privateKey;
-      const ret = {code:res.err?-1:0,txid:res.txid,message:res.err}
-      log(res.err?"Failed:":"Success Payment Obj:",JSON.stringify(payObj),JSON.stringify(ret));
-      return ret
+    };
+    console.log(config.data)
+    if (+payObj.amount < 200) {
+      resolve({ code: ERROR_TOOSMALL, msg: "cannot topup small amount" });
+      return;
+    }
+    const chain = payObj.chain ? payObj.chain : 'bsv'
+    const lib = await CoinFly.create(chain)
+    const res = await lib.send(config);
+    console.log(res)
+    delete payObj.privateKey;
+    const ret = { code: res.err ? -1 : 0, txid: res.txid, message: res.err }
+    log(res.err ? "Failed:" : "Success Payment Obj:", JSON.stringify(payObj), JSON.stringify(ret));
+    return ret
   }
 }
 
