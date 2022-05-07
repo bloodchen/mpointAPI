@@ -21,12 +21,20 @@ class Crawler {
     async getTxHistory({ address, num = 10, start = BLOCK_MIN, end = 0, raw = false, chain = 'bsv' }) {
         let txs = {}
         if (chain == 'bsv') {
-            if (!end || !this.db.isLocal(end,chain)){
+            if (!end || !this.db.isLocal(end, chain)) {
                 txs = await this.bsv.getTxHistory({ address, num, start, end })
+                if (txs == null) {//API error 
+                    this.bsv = PlanAPI
+                    txs = await this.bsv.getTxHistory({ address, num, start, end })
+                }
                 txs.chain = chain
             }
             else
-                txs = this.db.getTxHistory({ address, num, start, end, chain })            
+                txs = this.db.getTxHistory({ address, num, start, end, chain })
+            if (txs.code == 1) {
+                console.log("err, load from local db")
+                txs = this.db.getTxHistory({ address, num, start, end, chain })
+            }
             const res = this.db.getTxs(txs.c, chain)
             await this.downloadAndParseTx(txs.c)
             await this.downloadAndParseTx(txs.u)
@@ -38,17 +46,21 @@ class Crawler {
             this.relateToAddress(address, txs.u, raw)
         }
         if (chain == 'ar') {
-            if (!end || !this.db.isLocal(end,chain)){
+            if (!end || !this.db.isLocal(end, chain)) {
                 txs = await this.ar.getTxHistory({ address, num, start, end })
             }
             else
                 txs = this.db.getTxHistory({ address, num, start, end, chain })
+            if (txs.code == 1) {
+                console.log("err, load from local db")
+                txs = this.db.getTxHistory({ address, num, start, end, chain })
+            }
         }
         txs.chain = chain
         return txs
     }
     relateToAddress(address, txs, raw) {
-        if(!txs) return
+        if (!txs) return
         for (let tx of txs) {
             tx.amount = 0
             tx.type = tx.main.from.find(ad => ad.address === address) === undefined ? "income" : "spend"
@@ -75,20 +87,20 @@ class Crawler {
         }
     }
     async downloadAndParseTx(txs) {
-        if(!txs)return
+        if (!txs) return
         await this._download(txs)
         await this._parseTx(txs)
-        
+
     }
 
     async _download(txs) {
-        if(!txs)return
+        if (!txs) return
         let txids = [], i = 0
         for (let tx of txs) {
             i++
-            if (!tx.raw && !tx.main) 
+            if (!tx.raw && !tx.main)
                 txids.push(tx.txid)
-            if (txids.length>0&&(txids.length == 20 || i >= txs.length)) {
+            if (txids.length > 0 && (txids.length == 20 || i >= txs.length)) {
                 const res = await axios.post("https://api.whatsonchain.com/v1/bsv/main/txs/hex", { txids: txids })
                 if (res.data) {
                     console.log(res.data)
@@ -103,7 +115,7 @@ class Crawler {
 
     }
     async _parseTx(txs) {
-        if(!txs)return
+        if (!txs) return
         let utxos = []
         for (let i = 0; i < txs.length; i++) {
             const tx = txs[i]
@@ -111,7 +123,7 @@ class Crawler {
             const tx1 = bsv.Transaction(tx.raw)
             for (const inp of tx1.inputs) {
                 const txid = inp.prevTxId.toString('hex')
-                utxos.push({txid:txid, pos: inp.outputIndex})
+                utxos.push({ txid: txid, pos: inp.outputIndex })
             }
         }
         await WOCAPI.getUtxoValue(utxos)

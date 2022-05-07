@@ -72,7 +72,7 @@ class ARAPI {
             })
         } catch (e) {
             console.log(e.response)
-            return { code: 1, msg: e.response.data }
+            return { code: 1, c: [], u: [], msg: e.response.data }
         }
         let txs = { code: 0, c: [], u: [] };
         const data = res.data.data.transactions.edges
@@ -149,7 +149,7 @@ class SensibleAPI {
                 }
             }
             return txs
-        }
+        } else return null //api error
         return { c: [], u: [] }
     }
 }
@@ -167,32 +167,37 @@ class PlanAPI {
         if (start > 0 || end > 0) query.q.find["blk.i"] = {};
         if (start > 0) query.q.find["blk.i"]["$gt"] = start;
         if (end > 0) query.q.find["blk.i"]["$lt"] = end;
-        let res = await axios.post(url, JSON.stringify(query), {
-            headers: {
-                "Content-type": "application/json; charset=utf-8",
-                Accept: "application/json; charset=utf-8",
-                token: "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiIxQzc5M0RkVjI0Q3NORTJFUDZNbVZmckhqVlNGVmc2dU4iLCJpc3N1ZXIiOiJnZW5lcmljLWJpdGF1dGgifQ.SUJlYUc2TGNGdFlZaGk3amxwa3ZoRGZJUEpFcGhObWhpdVNqNXVBbkxORTdLMWRkaGNESC81SWJmM2J1N0V5SzFuakpKTWFPNXBTcVJlb0ZHRm5uSi9VPQ"
-            },
-            responseType: "stream" // important
-        });
-        let txs = [];
-        console.log("getting transactions...")
-        return new Promise(function (resolve, reject) {
-            res.data.on("end", function () {
-                resolve(txs);
-                return;
+        try {
+            let res = await axios.post(url, JSON.stringify(query), {
+                headers: {
+                    "Content-type": "application/json; charset=utf-8",
+                    Accept: "application/json; charset=utf-8",
+                    token: "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiIxQzc5M0RkVjI0Q3NORTJFUDZNbVZmckhqVlNGVmc2dU4iLCJpc3N1ZXIiOiJnZW5lcmljLWJpdGF1dGgifQ.SUJlYUc2TGNGdFlZaGk3amxwa3ZoRGZJUEpFcGhObWhpdVNqNXVBbkxORTdLMWRkaGNESC81SWJmM2J1N0V5SzFuakpKTWFPNXBTcVJlb0ZHRm5uSi9VPQ"
+                },
+                responseType: "stream" // important
             });
-            res.data.pipe(es.split()).pipe(
-                es.map((data, callback) => {
-                    if (data) {
-                        let d = JSON.parse(data);
-                        const tx = { txid: d.tx.h, block: d.blk.i, ts: d.blk.t }
-                        console.log("adding:", tx.txid)
-                        txs.push(tx);
-                    }
-                })
-            );
-        });
+            let txs = { c: [], u: [] };
+            console.log("getting transactions...")
+            return new Promise(function (resolve, reject) {
+                res.data.on("end", function () {
+                    resolve(txs);
+                    return;
+                });
+                res.data.pipe(es.split()).pipe(
+                    es.map((data, callback) => {
+                        if (data) {
+                            let d = JSON.parse(data);
+                            const tx = { txid: d.tx.h, block: d.blk.i, ts: d.blk.t }
+                            console.log("adding:", tx.txid)
+                            txs.c.push(tx);
+                        }
+                    })
+                );
+            });
+        } catch (e) {
+            console.error(e)
+            return null
+        }
     }
 }
 
