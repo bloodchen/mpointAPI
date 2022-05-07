@@ -72,7 +72,7 @@ class ARAPI {
             })
         } catch (e) {
             console.log(e.response)
-            return { code: 1, c: [], u: [], msg: e.response.data }
+            return { code: 1, c: [], u: [] }
         }
         let txs = { code: 0, c: [], u: [] };
         const data = res.data.data.transactions.edges
