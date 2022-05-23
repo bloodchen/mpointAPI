@@ -109,7 +109,8 @@ class mPoints {
         sort: Number(req.query.sort),
         start: Number(req.query.start),
         end: Number(req.query.end),
-        skip: Number(req.query.skip)
+        skip: Number(req.query.skip),
+        chain: req.query.chain
       });
       res.json(data);
     })
@@ -121,7 +122,7 @@ class mPoints {
     app.get("/v2/address/:address/history", async (req, res) => {
       const address = req.params['address']
       console.log("calling:", req.url, "query:", req.query)
-      var data = await this.getAllTX2({
+      var data = await this.getAllTX({
         address,
         num: Number(req.query.num),
         sort: Number(req.query.sort),
@@ -456,7 +457,7 @@ class mPoints {
   async preFetchAddress({ address, chain = 'bsv' }) {
     crawler.preFetch({ address, chain })
   }
-  async getAllTX2({ address, num, sort, start, end, skip, chain }) {
+  async getAllTX({ address, num, sort, start, end, skip, chain }) {
     if (!address) return null;
 
     address = address.trim();
@@ -468,7 +469,7 @@ class mPoints {
     if (isNaN(skip)) skip = 0;
     return await crawler.getTxHistory({ address, num, start, end, chain })
   }
-  async getAllTX({ address, num, sort, start, end, skip }) {
+  async getAllTX1({ address, num, sort, start, end, skip }) {
     if (!address) return null;
 
     address = address.trim();
