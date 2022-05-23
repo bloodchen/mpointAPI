@@ -21,9 +21,12 @@ class Crawler {
     async getTxHistory({ address, num = 10, start = BLOCK_MIN, end = 0, raw = false, chain = 'bsv' }) {
         let txs = {}
         if (chain == 'bsv') {
+            console.log(1)
             if (!end || !this.db.isLocal(end, chain)) {
+                console.log(2)
                 txs = await this.bsv.getTxHistory({ address, num, start, end })
                 if (txs == null) {//API error 
+                    console.log(3)
                     this.bsv = PlanAPI
                     txs = await this.bsv.getTxHistory({ address, num, start, end })
                 }
