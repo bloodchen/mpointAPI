@@ -134,23 +134,28 @@ class SensibleAPI {
         if (end && end != 0) end++
         if (start == 0) start = 650000
         let url = `https://api.sensiblequery.com/address/${address}/history/tx?start=${start}&end=${end}&cursor=0&size=${num * 2}`
-        const res = await axios.get(url)
-        if (res && res.data.code == 0) {
-            const data = res.data.data
-            let txs = { c: [], u: [] };
-            for (let i = 0; i < data.length; i++) {
-                const item = data[i]
-                const tx = { txid: item.txid, block: item.height, ts: item.timestamp }
-                if (item.height != 4294967295) txs.c.push(tx)
-                else {
-                    tx.block = -1;
-                    tx.ts = Math.floor(Date.now() / 1000)
-                    txs.u.push(tx)
+        try {
+
+            const res = await axios.get(url)
+            if (res && res.data.code == 0) {
+                const data = res.data.data
+                let txs = { c: [], u: [] };
+                for (let i = 0; i < data.length; i++) {
+                    const item = data[i]
+                    const tx = { txid: item.txid, block: item.height, ts: item.timestamp }
+                    if (item.height != 4294967295) txs.c.push(tx)
+                    else {
+                        tx.block = -1;
+                        tx.ts = Math.floor(Date.now() / 1000)
+                        txs.u.push(tx)
+                    }
                 }
-            }
-            return txs
-        } else return null //api error
-        return { c: [], u: [] }
+                return txs
+            } else return { c: [], u: [] }
+        } catch (e) {
+            return null //api error
+        }
+
     }
 }
 class PlanAPI {
