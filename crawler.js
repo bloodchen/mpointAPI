@@ -27,8 +27,8 @@ class Crawler {
                 txs = await this.bsv.getTxHistory({ address, num, start, end })
                 if (txs == null) {//API error 
                     console.log(3)
-                    this.bsv = PlanAPI
-                    txs = await this.bsv.getTxHistory({ address, num, start, end })
+                    //this.bsv = PlanAPI
+                    txs = await PlanAPI.getTxHistory({ address, num, start, end })
                 }
                 txs.chain = chain
             }
