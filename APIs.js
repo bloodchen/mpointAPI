@@ -84,6 +84,7 @@ class ARAPI {
             type == 'spend' ? tx.main = { from: [{ address }], to: [{ address: item.node.recipient }] } : tx.main = { from: [{ address: item.node.owner.address }], to: [{ address }] }
             tx.addresses = (address == item.node.recipient ? address + ";" + item.node.owner.address : address + ";" + item.node.recipient)
             tx.amount = Math.floor(+item.node.quantity.winston / 10000)
+            if (type == 'spend') tx.amount += tx.fee
             tx.block != -1 ? txs.c.push(tx) : txs.u.push(tx)
         }
         return txs
